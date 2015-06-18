@@ -1,0 +1,135 @@
+## OVERVIEW ##
+
+This is "ns2", a (hopefully) simple "network server" (not /name/ server)
+which can be thought of as a request-response TCP netcat-like server,
+for generic use.
+
+It consists of one main process, which can listen on multiple IPv4/IPv6 addrs
+and can serve multiple clients via a typical "forking server" design.
+
+The code should be easy enough to read, this README is just supplementary.
+
+## CLIENT PROTOCOL ##
+
+It uses a simple text-based protocol (but can be switched to binary) initiated
+by the client by sending a newline-terminated "control cmdline" with commands
+separated by `;' (semicolon) and command arguments separated by `,' (comma).
+These characters are considered special and cannot be escaped. Any other
+characters (excl. newline) are non-special and treated equally (incl. spaces).
+
+Why not use spaces?
+This leads to hell. When using spaces, the user expects a shell-like behavior,
+like treating multiple spaces as one, escape support, escape of the escape char,
+argument quoting, etc. By using commas and semicolons, we break the habit of
+expecting shell-like parsing and force the user to specify cmdline rigorously.
+
+The cmdline is parsed in each fork()ed child separately and commands are
+executed one by one, from left to right. When the cmdline reaches its end,
+the client socket is closed and the child exits.
+
+Why not read another cmdline?
+Partly because we would need to always specify an exit-like command, even for
+simple cmdlines, but mainly because we allow the commands to treat the client
+socket as a text/binary input/output for their purposes - when a command was
+running, it could freely read another cmdline destined for us and we'd have no
+control over it. Therefore we voluntarily *give up* any responsibility for
+the client socket as soon as the first newline (end of control cmdline)
+is detected.
+
+Once again - this is a major feature - we take super extra care using MSG_PEEK
+to not read anything beyond the first newline. This means that any command can
+implement its own text (or binary!) protocol as long as it can guarantee to
+exit at some point (allow other commands to run) and "eat" everything related
+to its protocol from the client socket before exiting, to not confuse other
+commands (!!).
+
+## RETURN CODES ##
+
+The parse() function of each command can return any integer value, which is
+returned to the client as rc (return code) in the form of '$rc $cmd\n'
+via the client socket. This is useful for easy error checking, client-side,
+and harmless for binary transfer within a single command.
+
+However there are uses for not returning these "control lines" back to
+the client, for which the "socket control mode" (sock_ctl_mode) was invented.
+Whenever client_info->sock_mode is CTL_MODE_CONTROL, these control lines
+are sent, when it's changed (ie. by a cmd) to CTL_MODE_BINARY, the control
+lines are *buffered* instead of being sent. The buffer is sent/emptied when
+the client socket is switched back to CTL_MODE_CONTROL.
+If the control cmdline provided by the client manage to end before the socket
+can be switched back to CONTROL, nothing is ever sent to the client.
+
+The 'ctl-mode' command is used for switching the socket modes.
+
+Returning a negative value from a command causes the ctl cmdline-parsing
+process to quit immediately without even sending return value of the cmd.
+
+## COMMAND PROGRAMMING INTERFACE ##
+
+See any of the simple commands like 'echo' or 'cat' on how you can make your
+own command. The mandatory thing is to provide a parse() function, which we
+call with a client_info structure, specifying the client socket, argc+argv
+the user specified on the control cmdline and more. This function is the core
+of your command - you can define more helper functions (as static!) if you like.
+You can also provide your own cleanup() function, see CLEANUP below.
+
+To allow this modularity, we use custom ELF binary section to store cmd_info
+structures. These are created at compile-time and then simply traversed at
+execution-time. This eliminates any need for registering your parse() function
+in the main program body.
+
+## CLEANUP ##
+
+There's a cleanup functionality that *should* return the system and listening
+server process to the original (new) state, as if the server was just started.
+This implies killing any child processes and their process groups, removing any
+temporary files, freeing any shared resources, etc.
+It can be triggered by sending SIGHUP to the listening server process, which
+executes all per-command cleanup() functions and then kills all its children
+(and their process groups / further child processes) with SIGKILL.
+
+VERY IMPORTANT facts about running cleanup:
+- it is executed from a signal handler, which means that YOU CANNOT rely on ANY
+  non-const variables modified after installing the signal handler (sigaction)
+  because any such variables might be partially written (ie. 4 out of 8 bytes)
+  when the signal/interrupt is received
+- all per-command cleanup() functions are subject to signal handler limitations,
+  meaning you can't use variables from normal command runtime
+- all per-command cleanup() functions are executed from the listening server
+  process (its signal handler), meaning any syscalls are executed as
+  the listening server, NOT its command-parsing child, ie. getpid() returns
+  the listening processes' pid, not the pid of the per-command parsing process
+  - this - by extension - means that all cleanups need to be very generic and
+    clean up everything possibly left by any number of instances of the same
+    command from any number of clients - cleanups affect all connected clients
+    - ie. 5 clients, each doing 'exec' cmd - the cleanup is executed only once,
+      but it needs to kill all processes spawned by all 5 exec cmds from all
+      clients
+
+When to use cleanup?
+You should really never need to use cleanup. The only exception is manual
+intervention when you're ABSOLUTELY sure that the server isn't used by other
+clients. You *cannot* run cleanup even with exclusive lock as that would
+disconnect any legitimate clients waiting for unlock.
+
+## LOCKING ##
+
+Each new client automatically gets a shared lock on the server. This means that
+any number of clients can use the server simultaneously under normal conditions.
+If a client (command) needs exclusive access to the server (OS), it can use the
+`lock' command to wait for other clients to finish and get an exclusive access.
+
+Note that - in this flock() implementation - while `lock' is waiting, new
+clients can freely connect with a shared lock, meaning the request for exclusive
+access can easily starve. This can't be easily fixed, the one client will simply
+have to wait until all others are done.
+
+While holding the exclusive lock, new clients are blocked right after connecting
+(conn being accept()ed by the server) and held waiting until the exclusive
+access is released.
+
+The exclusive access can be released by `unlock', downgrading the lock back to
+shared, or simply by exiting. Any locks (shared or exclusive) are released when
+the command-parsing per-client process exits - this is guaranteed by the kernel.
+
+# vim: syntax=off :

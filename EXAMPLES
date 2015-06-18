@@ -1,0 +1,29 @@
+#
+# setup:
+
+alias send-ns='socat stdio tcp-connect:localhost:1234'
+sudo ./ns2 0.0.0.0 1234   # for lock file & fd transfer
+
+#
+# examples:
+
+# run a command (echo) with "binary" output
+echo 'ctl-mode,binary;echo,test1;ctl-detach;ctl-recv,somestr;ctl-mode,control;' | send-ns > out.bin
+# get its return code
+echo 'ctl-send,somestr' | send-ns | grep '^echo'
+
+# run an external command, passing binary input
+# (see what exec/summer does first)
+{ echo 'exec,summer'; cat /bin/bash; } | send-ns  # md5sum on server
+cat /bin/bash | md5sum -                          # md5sum on our machine
+# (both should be identical)
+
+# combine the two above, sum a binary stream, interact per partes
+# - prepare the server in binary mode, detach
+echo 'ctl-mode,binary;ctl-detach;ctl-recv,blah;exec,summer;ctl-detach;ctl-recv,blah;ctl-mode,control;' | send-ns
+# - send / receive just the binary data to / from the summer
+{ echo 'ctl-send,blah;'; cat /bin/bash; } | send-ns
+# - locally check the sum (should be identocal)
+cat /bin/bash | md5sum -
+# - collect the return values from the server
+echo 'ctl-send,blah;' | send-ns
