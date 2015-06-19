@@ -1,0 +1,9 @@
+[Unit]
+Description=audit-test network-server v2
+
+[Service]
+# ipv4 socket opened by kernel, /proc/sys/net/ipv6/bindv6only is 0
+ExecStart=/usr/local/eal4_testing/audit-test/utils/ns2/ns2 :: 5000
+
+[Install]
+WantedBy=multi-user.target
