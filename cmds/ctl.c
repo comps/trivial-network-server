@@ -127,7 +127,7 @@ static int recv_fd(int via, int *fd)
     if (cmsg->cmsg_level != SOL_SOCKET || cmsg->cmsg_type != SCM_RIGHTS)
         return -1;
 
-    *fd = *((int *) CMSG_DATA(cmsg));
+    memcpy(fd, CMSG_DATA(cmsg), sizeof(int));
     return 0;
 }
 
