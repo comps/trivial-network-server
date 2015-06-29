@@ -233,7 +233,9 @@ void process_client(int clientfd)
     linesz = sockread_until(clientfd, buff, sizeof(buff), '\n');
     if (linesz == -1)
         error_down("control cmdline too big (%d+ bytes)\n", sizeof(buff));
-    buff[linesz-1] = '\0';
+    /* FIXME: should be buff[linesz-1], but gcc 4.8 doesn't like it,
+     * despite linesz being always >0 here */
+    *(buff+linesz-1) = '\0';
     /* for telnet & others - if next-to-last chr is \r, zero it too */
     if (linesz > 1 && buff[linesz-2] == '\r')
         buff[linesz-2] = '\0';
