@@ -1,17 +1,19 @@
-CFLAGS += -std=gnu99 -pedantic -I$(CURDIR)
-LDFLAGS += -lselinux
+TOPDIR		= ../..
 
-all: ns2
+include $(TOPDIR)/rules.mk
+
+ALL_EXE		= ns2
+
+ns2: CFLAGS += -std=gnu99 -pedantic -I$(CURDIR)
+ns2: LDFLAGS += -lselinux
+
 ns2: shared.c main.c client.c locking.c cleanup.c cmds/*.c
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
-.PHONY: install
+executables: $(ALL_EXE)
+
 install: ns2
 	install -o root -g root -m 0644 ns2.service /etc/systemd/system
 	systemctl daemon-reload
 	systemctl enable ns2
 	systemctl start ns2
-
-.PHONY: clean
-clean:
-	rm -f ns2
