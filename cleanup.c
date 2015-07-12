@@ -98,9 +98,6 @@ static void do_cleanup(void)
     traverse_children(getpid(), kill_child, &killwith);
     /* collect all zombies */
     while (waitpid(-1, NULL, WNOHANG) > 0);
-
-    /* remove leftover lockfile */
-    srvlock_cleanup();
 }
 
 /* signal handlers */

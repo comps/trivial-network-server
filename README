@@ -114,22 +114,37 @@ disconnect any legitimate clients waiting for unlock.
 
 ## LOCKING ##
 
-Each new client automatically gets a shared lock on the server. This means that
-any number of clients can use the server simultaneously under normal conditions.
-If a client (command) needs exclusive access to the server (OS), it can use the
-`lock' command to wait for other clients to finish and get an exclusive access.
+Locking is a manual, voluntary action in this implementation (instead of
+a mandatory one) for variety of reasons:
+
+- flexibility, cmd-send/recv - only the client knows which new tcp connection
+  starts a whole new "session" and which re-attaches to a previous one - forcing
+  lock on the reattachment section if the original one holds an exclusive lock
+  would result in a deadlock
+
+- critical cleanup - when a session doing (infinitely long) recv() dies, holding
+  an exclusive lock, there's no way to remotely cleanup the server, because any
+  attempt to connect will block on the lock
+
+- mandatory blocking - the client can't check beforehand if the server is locked
+  and voluntarily decide to give up - the server just grabs the connection and
+  waits for the lock, with no notice, nothing
+
+(and more).
+
+Therefore it's up to the clients to lock the server with a shared lock on each
+new connection, giving them the ability to do it the non-blocking way, with the
+option to opt-out in critical situations.
 
 Note that - in this flock() implementation - while `lock' is waiting, new
 clients can freely connect with a shared lock, meaning the request for exclusive
 access can easily starve. This can't be easily fixed, the one client will simply
 have to wait until all others are done.
 
-While holding the exclusive lock, new clients are blocked right after connecting
-(conn being accept()ed by the server) and held waiting until the exclusive
-access is released.
+A shared lock can be upgraded to exclusive and exclusive can be downgraded
+back to shared, using the `lock' and `unlock' commands:
 
-The exclusive access can be released by `unlock', downgrading the lock back to
-shared, or simply by exiting. Any locks (shared or exclusive) are released when
-the command-parsing per-client process exits - this is guaranteed by the kernel.
+- lock (no lock -> shared -> exclusive)    - upgrade a lock
+- unlock (exclusive -> shared -> no lock)  - downgrade a lock
 
 # vim: syntax=off :

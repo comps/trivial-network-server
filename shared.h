@@ -78,10 +78,6 @@ int create_socket(char *, char *, int, int);
 int parse_args(char ***, char *, char);
 void process_client(int);
 
-/* lock related stuff from locking.h */
-int srvlock(int);
-void srvlock_cleanup(void);
-
 /* cleanup signal handler from cleanup.c */
 void cleanup_sig_handler(int);
 void cleanup_exit_handler(int);

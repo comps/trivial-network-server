@@ -225,10 +225,6 @@ void process_client(int clientfd)
     char buff[CTL_CMDLINE_MAX];
     ssize_t linesz;
 
-    /* take a shared server lock, wait for exclusive clients to finish */
-    if (srvlock(LOCK_SH) == -1)
-        perror_down("srvlock");
-
     /* read the control cmdline, zero the delimiter(s) */
     linesz = sockread_until(clientfd, buff, sizeof(buff), '\n');
     if (linesz == -1)
@@ -243,7 +239,6 @@ void process_client(int clientfd)
     /* parse the null-terminated control cmdline we just read */
     parse_ctl_cmdline(clientfd, buff);
 
-    srvlock(LOCK_UN);
     shutdown(clientfd, SHUT_RDWR);
     close(clientfd);
 }
