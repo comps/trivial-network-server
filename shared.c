@@ -74,16 +74,16 @@ void (*xsignal(int signum, void (*newhandler)(int)))(int)
     return oldact.sa_handler;
 }
 
-/* iterate over cmd infos in the cmds ELF section */
-struct cmd_info *cmds_iterate(struct cmd_info *itr)
+/* iterate over cmd descs in the cmds ELF section */
+struct cmd_desc *cmd_descs_iterate(struct cmd_desc *itr)
 {
     if (itr == NULL) {
-        if (&__start_cmds >= &__stop_cmds)
+        if (&__start_cmd_descs >= &__stop_cmd_descs)
             return NULL;
         else
-            return &__start_cmds;
+            return &__start_cmd_descs;
     }
-    if (++itr < &__stop_cmds)
+    if (++itr < &__stop_cmd_descs)
         return itr;
     return NULL;
 }

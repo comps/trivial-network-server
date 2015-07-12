@@ -84,10 +84,10 @@ static void kill_child(pid_t child, void *sig)
 static void do_cleanup(void)
 {
     int killwith = SIGKILL;
-    struct cmd_info *ptr = NULL;
+    struct cmd_desc *ptr = NULL;
 
     /* call cleanup functions for each command */
-    while ((ptr = cmds_iterate(ptr)) != NULL) {
+    while ((ptr = cmd_descs_iterate(ptr)) != NULL) {
         /* we can do this in a signal handler because the list of func
          * pointers was created at compile time, not during runtime */
         if (ptr->cleanup != NULL)

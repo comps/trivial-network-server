@@ -18,9 +18,9 @@
 static int lockfd = -1;
 static int lock_type = 0;
 
-static int cmd_lock(int argc, char **argv, struct client_info *c)
+static int cmd_lock(int argc, char **argv, struct session_info *info)
 {
-    UNUSED(c);
+    UNUSED(info);
     int type = 0;
 
     if (argc > 1 && !strcmp(argv[1], "sh")) {
@@ -38,7 +38,8 @@ static int cmd_lock(int argc, char **argv, struct client_info *c)
     }
 
     if (lockfd == -1) {
-        lockfd = open(GLOBAL_LOCK_FILE, O_RDONLY|O_CREAT|O_NOCTTY|O_CLOEXEC, 0600);
+        lockfd = open(GLOBAL_LOCK_FILE,
+                      O_RDONLY|O_CREAT|O_NOCTTY|O_CLOEXEC, 0600);
         if (lockfd == -1) {
             perror("lock/open");
             return -1;  /* dangerous to go on without a lock */
@@ -67,9 +68,9 @@ static int cmd_lock(int argc, char **argv, struct client_info *c)
     return 0;
 }
 
-static int cmd_unlock(int argc, char **argv, struct client_info *c)
+static int cmd_unlock(int argc, char **argv, struct session_info *info)
 {
-    UNUSED3(argc, argv, c);
+    UNUSED3(argc, argv, info);
     int op;
 
     /* just downgrade the lock:
@@ -93,12 +94,12 @@ static void cmd_lock_cleanup(void)
     unlink(GLOBAL_LOCK_FILE);
 }
 
-static __newcmd struct cmd_info cmd1 = {
+static __newcmd struct cmd_desc cmd1 = {
     .name = "lock",
     .parse = cmd_lock,
     .cleanup = cmd_lock_cleanup,
 };
-static __newcmd struct cmd_info cmd2 = {
+static __newcmd struct cmd_desc cmd2 = {
     .name = "unlock",
     .parse = cmd_unlock,
 };

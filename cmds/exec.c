@@ -39,7 +39,7 @@ char **append_zero_elem(char **arr, int elems)
     return ret;
 }
 
-static int parse(int argc, char **argv, struct client_info *c)
+static int parse(int argc, char **argv, struct session_info *info)
 {
     int status;
     pid_t childpid;
@@ -71,12 +71,12 @@ static int parse(int argc, char **argv, struct client_info *c)
             /* reopen stdio on the client socket, leave stderr on the server
              * for debug purposes - this also leaves any other possibly open
              * fds (by other commands) for the exec'd command to use */
-            if (c->sock != -1) {
+            if (info->sock != -1) {
                 if (close(STDIN_FILENO) == -1 || close(STDOUT_FILENO) == -1)
                     exit(ERR_RET);
-                if (dup2(c->sock, STDIN_FILENO) == -1)
+                if (dup2(info->sock, STDIN_FILENO) == -1)
                     exit(ERR_RET);
-                if (dup2(c->sock, STDOUT_FILENO) == -1)
+                if (dup2(info->sock, STDOUT_FILENO) == -1)
                     exit(ERR_RET);
             }
 
@@ -98,7 +98,7 @@ static int parse(int argc, char **argv, struct client_info *c)
     return WEXITSTATUS(status);
 }
 
-static __newcmd struct cmd_info cmd = {
+static __newcmd struct cmd_desc cmd = {
     .name = "exec",
     .parse = parse,
     /* cleanup taken care of generically - parent kills children recursively */

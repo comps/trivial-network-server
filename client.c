@@ -2,11 +2,6 @@
  * per-client code, gets invoked after accepting client connection and takes
  * care of control cmdline parsing, command execution, etc.,
  * basically per-client stuff
- *
- * overview, for readability:
- *   process_client() - our "main", gets called from outside
- *   `-> parse_ctl_cmdline() - chops cmdline into commands with args (`;')
- *       `-> parse_cmd() - chops args (`,') and calls the cmd->parse() func
  */
 
 #include <stdio.h>
@@ -28,76 +23,104 @@
  * names and their return values when we can't send these right away */
 #define CTL_OUTBUFF_MAX 8192
 
-/* create argv array based on delim-separated string,
- * remember to free() it ! */
-int parse_args(char ***argv, char *string, char delim)
+/* cmd linked list management - the input control cmdline is parsed and
+ * transformed using these functions into a linked list before execution */
+static struct cmd *
+cmd_list_add(struct cmd *c, int argc, char **argv, struct cmd_desc *desc)
 {
-    int argc, i;
-    char *s;
+    struct cmd *newcmd;
 
-    /* count args, start from 1 (counting words, not commas) */
-    s = string;
-    for (argc = 1; *s != '\0'; argc += !!(*s == delim), s++);
+    newcmd = xmalloc(sizeof(struct cmd));
+    newcmd->argc = argc;
+    newcmd->argv = argv;
+    newcmd->desc = desc;
 
-    *argv = xmalloc(sizeof(char*) * argc);
-    *argv[0] = string;
-
-    /* parse/modify the string itself, manually
-     * (strtok can't handle empty arguments) */
-    s = string;
-    for (i = 1; *s != '\0'; s++) {
-        if (*s == delim) {
-            *s = '\0';
-            (*argv)[i++] = s+1;
-        }
+    if (!c) {
+        newcmd->prev = newcmd->next = NULL;
+    } else {
+        newcmd->prev = c;
+        c->next = newcmd;
     }
 
+    return newcmd;
+}
+static struct cmd *cmd_list_rewind(struct cmd *end)
+{
+    while (end && end->prev)
+        end = end->prev;
+    return end;
+}
+
+/* create argv array based on delims-separated string,
+ * remember to free() it ! */
+static int parse_argv(char ***argv, char *string, char *delims)
+{
+    int argc = 0;
+    char *arg, *tmp;
+
+    *argv = NULL;
+    arg = strtok_r(string, delims, &tmp);
+    while (arg) {
+        argc++;
+        *argv = xrealloc(*argv, sizeof(char*) * argc);
+        (*argv)[argc-1] = arg;
+        arg = strtok_r(NULL, delims, &tmp);
+    }
     return argc;
 }
 
-/* find cmd_info struct based on name */
-static struct cmd_info *find_cmd(char *name)
+/* find cmd_desc struct based on name */
+static struct cmd_desc *find_cmd_desc(char *name)
 {
-    struct cmd_info *ptr = NULL;
-    while ((ptr = cmds_iterate(ptr)) != NULL)
+    struct cmd_desc *ptr = NULL;
+    while ((ptr = cmd_descs_iterate(ptr)) != NULL)
         if (!strcmp(ptr->name, name))
             break;
     return ptr;
 }
 
-/* based on a `;'-separated portion of the control cmdline, call/wrap command
- * parse functions, preparing argv, looking for cmd name, etc. */
-static int parse_cmd(char *cmdline_part, struct client_info *cl)
+/* parse cmd structures (with argc/argv) out of a control cmdline into a list */
+static struct cmd *parse_cmds(char *cmdline)
 {
-    struct cmd_info *cmdinfo;
-    int cmd_argc;
-    char **cmd_argv, *cmdline_part_copy;
-    int rc;
+    char *cmd_args, *tmp;
+    struct cmd *cmd = NULL;
 
-    /* don't modify paren't copy of cmdline_part */
-    cmdline_part_copy = xmalloc(strlen(cmdline_part)+1);
-    strcpy(cmdline_part_copy, cmdline_part);
+    int argc;
+    char **argv;
+    struct cmd_desc *desc;
 
-    /* parse cmdline part into cmd name + args */
-    /* (there's always going to be at least argv[0] because our parent func
-     * skips empty `;'-separated strings) */
-    cmd_argc = parse_args(&cmd_argv, cmdline_part_copy, ',');
-
-    /* find a command (handler), fail if none found */
-    cmdinfo = find_cmd(cmd_argv[0]);
-    if (!cmdinfo) {
-        error("cmd not found: %s\n", cmd_argv[0]);
-        rc = -1;
-        goto ret;
+    cmd_args = strtok_r(cmdline, ";", &tmp);
+    while (cmd_args) {
+        argc = parse_argv(&argv, cmd_args, ",");
+        if (!argc)
+            error_down("cmd args empty\n");
+        desc = find_cmd_desc(argv[0]);
+        if (!desc)
+            error_down("cmd not found: %s\n", argv[0]);
+        cmd = cmd_list_add(cmd, argc, argv, desc);
+        cmd_args = strtok_r(NULL, ";", &tmp);
     }
 
-    /* call the handler */
-    rc = cmdinfo->parse(cmd_argc, cmd_argv, cl);
+    /* first cmd of the list */
+    cmd = cmd_list_rewind(cmd);
+    return cmd;
+}
 
-ret:
-    free(cmd_argv);
-    free(cmdline_part_copy);
-    return rc;
+/* based on an argc+argv, rebuild the original `,'-separated command */
+static char *rebuild_args(int argc, char **argv)
+{
+    int i, len = 0;
+    char *args;
+    for (i = 0; i < argc; i++)
+        len += strlen(argv[i]) + 1; /* for `,' */
+    args = xmalloc(len);
+    *args = '\0';
+    for (i = 0; i < argc; i++) {
+        strcat(args, argv[i]);
+        if (i < argc-1)
+            strcat(args, ",");
+    }
+    return args;
 }
 
 /* append printf-formatted string to the buffer, but only if the entire
@@ -131,7 +154,7 @@ static int snprintfcat(char *str, size_t size, const char *format, ...)
 
 /* write (fully or partially) a string to a socket, remove the written bytes
  * from the string (shifting it to the left) */
-ssize_t write_str(int fd, char *str)
+static ssize_t write_str(int fd, char *str)
 {
     ssize_t rc;
     size_t len = strlen(str);
@@ -143,42 +166,50 @@ ssize_t write_str(int fd, char *str)
 }
 
 /* parse the control cmdline supplied by client, call individual cmds */
-static void parse_ctl_cmdline(int clientfd, char *cmdline)
+static void process_ctl_cmdline(int clientfd, char *cmdline)
 {
     int rc;
     char ctl_buff[CTL_OUTBUFF_MAX];
 
-    int i;
-    int line_argc;
-    char **line_argv;
-    struct client_info clinfo;
+    char *args;
+    struct cmd *cmd, *tmp = NULL;
+    struct session_info info;
 
     *ctl_buff = '\0';
-    memset(&clinfo, 0, sizeof(struct client_info));
-    clinfo.sock = clientfd;
-    clinfo.sock_mode = CTL_MODE_CONTROL;
 
-    /* parse control cmdline into commands */
-    line_argc = parse_args(&line_argv, cmdline, ';');
+    /* parse the control cmdline into a list */
+    cmd = parse_cmds(cmdline);
+    if (!cmd)
+        error_down("no cmds on the ctl cmdline\n");
+
+    /* prepare shared session info */
+    memset(&info, 0, sizeof(struct session_info));
+    info.sock = clientfd;
+    info.sock_mode = CTL_MODE_CONTROL;
 
     /* for each command */
-    for (i = 0; i < line_argc; i++) {
-        /* skip if empty, ie. ';' at the end */
-        if (*line_argv[i] == '\0')
-            continue;
-
-        /* call the cmd, if any matches */
-        rc = parse_cmd(line_argv[i], &clinfo);
-        if (rc < 0)
-            break;
-
+    while (cmd) {
+        info.cmd = cmd;
+        /* call the parser */
+        rc = cmd->desc->parse(cmd->argc, cmd->argv, &info);
         /* append "$rc $name" to the ctl outbuff and send it out */
-        snprintfcat(ctl_buff, sizeof(ctl_buff), "%d %s\n", rc, line_argv[i]);
-        if (clinfo.sock_mode == CTL_MODE_CONTROL && clinfo.sock != -1)
-            write_str(clinfo.sock, ctl_buff);
+        args = rebuild_args(cmd->argc, cmd->argv);
+        snprintfcat(ctl_buff, sizeof(ctl_buff), "%d %s\n", rc, args);
+        free(args);
+        if (info.sock_mode == CTL_MODE_CONTROL && info.sock != -1)
+            write_str(info.sock, ctl_buff);
+        tmp = cmd;
+        cmd = cmd->next;
     }
 
-    free(line_argv);
+    /* free allocated structures */
+    cmd = cmd_list_rewind(tmp);
+    while (cmd) {
+        free(cmd->argv);
+        tmp = cmd->next;
+        free(cmd);
+        cmd = tmp;
+    }
 }
 
 /* read from a socket until delim is found/read
@@ -219,7 +250,7 @@ sockread_until(int fd, char *rcvbuff, size_t buffsiz, char delimchr)
     return -1;
 }
 
-/* handle basic input/output client interaction of control cmdlines */
+/* handle basic input/output client interaction */
 void process_client(int clientfd)
 {
     char buff[CTL_CMDLINE_MAX];
@@ -242,7 +273,7 @@ void process_client(int clientfd)
         buff[linesz-2] = '\0';
 
     /* parse the null-terminated control cmdline we just read */
-    parse_ctl_cmdline(clientfd, buff);
+    process_ctl_cmdline(clientfd, buff);
 
     shutdown(clientfd, SHUT_RDWR);
     close(clientfd);

@@ -73,7 +73,7 @@ the user specified on the control cmdline and more. This function is the core
 of your command - you can define more helper functions (as static!) if you like.
 You can also provide your own cleanup() function, see CLEANUP below.
 
-To allow this modularity, we use custom ELF binary section to store cmd_info
+To allow this modularity, we use custom ELF binary section to store cmd_desc
 structures. These are created at compile-time and then simply traversed at
 execution-time. This eliminates any need for registering your parse() function
 in the main program body.

@@ -8,9 +8,10 @@
  *   getcon,[raw]
  */
 
-static int cmd_setsockcreatecon(int argc, char **argv, struct client_info *c)
+static int
+cmd_setsockcreatecon(int argc, char **argv, struct session_info *info)
 {
-    UNUSED(c);
+    UNUSED(info);
     if (argc < 2)
         return 1;
 
@@ -20,7 +21,7 @@ static int cmd_setsockcreatecon(int argc, char **argv, struct client_info *c)
     return 0;
 }
 
-static int cmd_getcon(int argc, char **argv, struct client_info *c)
+static int cmd_getcon(int argc, char **argv, struct session_info *info)
 {
     char *ctx;
 
@@ -32,18 +33,18 @@ static int cmd_getcon(int argc, char **argv, struct client_info *c)
             return 1;
     }
 
-    dprintf(c->sock, "%s\n", ctx);
+    dprintf(info->sock, "%s\n", ctx);
 
     freecon(ctx);
 
     return 0;
 }
 
-static __newcmd struct cmd_info cmd1 = {
+static __newcmd struct cmd_desc cmd1 = {
     .name = "setsockcreatecon",
     .parse = cmd_setsockcreatecon,
 };
-static __newcmd struct cmd_info cmd2 = {
+static __newcmd struct cmd_desc cmd2 = {
     .name = "getcon",
     .parse = cmd_getcon,
 };

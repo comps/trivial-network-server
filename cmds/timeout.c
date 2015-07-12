@@ -15,9 +15,9 @@ static void handle_exit(int signum)
     _exit(EXIT_SUCCESS);
 }
 
-static int parse(int argc, char **argv, struct client_info *c)
+static int parse(int argc, char **argv, struct session_info *info)
 {
-    UNUSED(c);
+    UNUSED(info);
     int ret, secs;
     struct sigaction action;
 
@@ -45,7 +45,7 @@ static int parse(int argc, char **argv, struct client_info *c)
     return 0;
 }
 
-static __newcmd struct cmd_info cmd = {
+static __newcmd struct cmd_desc cmd = {
     .name = "timeout",
     .parse = parse,
 };

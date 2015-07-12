@@ -5,16 +5,16 @@
  * list all available commands by going through the command ELF data section
  */
 
-static int parse(int argc, char **argv, struct client_info *c)
+static int parse(int argc, char **argv, struct session_info *info)
 {
     UNUSED2(argc, argv);
-    struct cmd_info *cmd = NULL;
-    while ((cmd = cmds_iterate(cmd)) != NULL)
-        dprintf(c->sock, "> %s\n", cmd->name);
+    struct cmd_desc *cmd = NULL;
+    while ((cmd = cmd_descs_iterate(cmd)) != NULL)
+        dprintf(info->sock, "> %s\n", cmd->name);
     return 0;
 }
 
-static __newcmd struct cmd_info cmd = {
+static __newcmd struct cmd_desc cmd = {
     .name = "cmds",
     .parse = parse,
 };

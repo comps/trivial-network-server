@@ -8,9 +8,9 @@
 /* DO NOT USE THIS COMMAND UNLESS YOU REALLY, REALLY KNOW THE IMPLICATIONS,
  * see README, ## CLEANUP ## section, at the bottom */
 
-static int parse(int argc, char **argv, struct client_info *c)
+static int parse(int argc, char **argv, struct session_info *info)
 {
-    UNUSED3(argc, argv, c);
+    UNUSED3(argc, argv, info);
     kill(getppid(), SIGHUP);
     
     /* there's nothing more we can reliably do here, we might have enough
@@ -21,7 +21,7 @@ static int parse(int argc, char **argv, struct client_info *c)
     return 1;
 }
 
-static __newcmd struct cmd_info cmd = {
+static __newcmd struct cmd_desc cmd = {
     .name = "cleanup",
     .parse = parse,
 };

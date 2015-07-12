@@ -36,34 +36,34 @@
  *   ctl-send,<string>   # string should be unique, same for recv and send
  */
 
-static int cmd_detach(int argc, char **argv, struct client_info *c)
+static int cmd_detach(int argc, char **argv, struct session_info *info)
 {
-    if (c->sock == -1)
+    if (info->sock == -1)
         return 1;
 
     if (argc > 1 && !strcmp(argv[1], "force")) {
         /* send RST or otherwise "forcibly" close the connection,
          * (results in ECONNRESET on client, making nmap-ncat *really* exit) */
-        setsockopt(c->sock, SOL_SOCKET, SO_LINGER,
+        setsockopt(info->sock, SOL_SOCKET, SO_LINGER,
                    &(struct linger){1, 0}, sizeof(struct linger));
     } else {
         /* clean, with default background linger */
-        shutdown(c->sock, SHUT_RDWR);
+        shutdown(info->sock, SHUT_RDWR);
     }
-    close(c->sock);
-    c->sock = -1;
+    close(info->sock);
+    info->sock = -1;
     return 0;
 }
 
-static int cmd_mode(int argc, char **argv, struct client_info *c)
+static int cmd_mode(int argc, char **argv, struct session_info *info)
 {
     if (argc < 2)
        return 1;
 
     if (!strcmp(argv[1], "control"))
-        c->sock_mode = CTL_MODE_CONTROL;
+        info->sock_mode = CTL_MODE_CONTROL;
     else if (!strcmp(argv[1], "binary"))
-        c->sock_mode = CTL_MODE_BINARY;
+        info->sock_mode = CTL_MODE_BINARY;
     else
         return 1;
 
@@ -177,7 +177,7 @@ static int connect_unix(char *path)
     return fd;
 }
 
-static int cmd_recv(int argc, char **argv, struct client_info *c)
+static int cmd_recv(int argc, char **argv, struct session_info *info)
 {
     int unixfd, fd;
     char namebuf[128];
@@ -204,7 +204,7 @@ static int cmd_recv(int argc, char **argv, struct client_info *c)
     }
 
     unlink(namebuf);
-    c->sock = fd;
+    info->sock = fd;
     return 0;
 }
 static void cmd_recv_cleanup(void)
@@ -229,12 +229,12 @@ static void cmd_recv_cleanup(void)
     rmdir(VAR_RUN_DIR);
 }
 
-static int cmd_send(int argc, char **argv, struct client_info *c)
+static int cmd_send(int argc, char **argv, struct session_info *info)
 {
     int unixfd;
     char namebuf[128];
 
-    if (c->sock == -1)
+    if (info->sock == -1)
         return 1;
 
     if (argc < 2)
@@ -250,33 +250,33 @@ static int cmd_send(int argc, char **argv, struct client_info *c)
         return -1;  /* cannot afford to continue */
     }
 
-    if (send_fd(unixfd, c->sock) == -1) {
+    if (send_fd(unixfd, info->sock) == -1) {
         perror("send_fd");
         return -1;  /* cannot afford to continue */
     }
 
     /* sucessfully sent, close for us */
-    close(c->sock);
-    c->sock = -1;
+    close(info->sock);
+    info->sock = -1;
 
     return 0;
 }
 
 
-static __newcmd struct cmd_info cmd1 = {
+static __newcmd struct cmd_desc cmd1 = {
     .name = "ctl-detach",
     .parse = cmd_detach,
 };
-static __newcmd struct cmd_info cmd2 = {
+static __newcmd struct cmd_desc cmd2 = {
     .name = "ctl-mode",
     .parse = cmd_mode,
 };
-static __newcmd struct cmd_info cmd3 = {
+static __newcmd struct cmd_desc cmd3 = {
     .name = "ctl-recv",
     .parse = cmd_recv,
     .cleanup = cmd_recv_cleanup,
 };
-static __newcmd struct cmd_info cmd4 = {
+static __newcmd struct cmd_desc cmd4 = {
     .name = "ctl-send",
     .parse = cmd_send,
 };

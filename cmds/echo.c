@@ -2,20 +2,20 @@
 #include <unistd.h>
 #include "shared.h"
 
-static int parse(int argc, char **argv, struct client_info *c)
+static int parse(int argc, char **argv, struct session_info *info)
 {
     int i;
 
-    if (c->sock == -1)
+    if (info->sock == -1)
         return 1;
 
     for (i = 1; i < argc; i++)
-        dprintf(c->sock, "%s\n", argv[i]);
+        dprintf(info->sock, "%s\n", argv[i]);
 
     return 0;
 }
 
-static __newcmd struct cmd_info cmd = {
+static __newcmd struct cmd_desc cmd = {
     .name = "echo",
     .parse = parse,
 };

@@ -27,7 +27,7 @@ enum dir {
     DIR_RECV = 1,  /* same as 'server' for create_socket() */
 };
 
-static int recvsend(enum dir dir, struct client_info *c,
+static int recvsend(enum dir dir, struct session_info *info,
                     char *addr, char *proto, char *port, int dgrams)
 {
     int s = -1, cs;
@@ -61,15 +61,15 @@ static int recvsend(enum dir dir, struct client_info *c,
         /* also, if the client sock is in binary mode, echo recv'd data */
         while (((stype == SOCK_DGRAM && dgrams-- > 0) || stype != SOCK_DGRAM)
                && (bytes = read(s, buff, MAX_DGRAM_SIZE)) > 0)
-            if (c->sock != -1 && c->sock_mode == CTL_MODE_BINARY)
-                write(c->sock, buff, bytes);
+            if (info->sock != -1 && info->sock_mode == CTL_MODE_BINARY)
+                write(info->sock, buff, bytes);
         break;
     case DIR_SEND:
         /* if the client sock is in binary mode, read data from it until read()
          * returns 0 (client ended / sent empty packet on ^D),
          * otherwise just send some random data */
-        if (c->sock_mode == CTL_MODE_BINARY) {
-            while ((bytes = read(c->sock, buff, MAX_DGRAM_SIZE)) > 0)
+        if (info->sock_mode == CTL_MODE_BINARY) {
+            while ((bytes = read(info->sock, buff, MAX_DGRAM_SIZE)) > 0)
                 write(s, buff, bytes);
         } else {
             strcpy(buff, "lorem ipsum dolor sit amet\n");
@@ -89,24 +89,24 @@ err:
     return 1;
 }
 
-static int cmd_recv(int argc, char **argv, struct client_info *c)
+static int cmd_recv(int argc, char **argv, struct session_info *info)
 {
     if (argc < 4)
         return 1;
 
-    return recvsend(DIR_RECV, c, argv[1], argv[2], argv[3],
+    return recvsend(DIR_RECV, info, argv[1], argv[2], argv[3],
                     (argc >= 5) ? atoi(argv[4]) : 1);
 }
 
-static int cmd_send(int argc, char **argv, struct client_info *c)
+static int cmd_send(int argc, char **argv, struct session_info *info)
 {
     if (argc < 4)
         return 1;
 
-    return recvsend(DIR_SEND, c, argv[1], argv[2], argv[3], 1);
+    return recvsend(DIR_SEND, info, argv[1], argv[2], argv[3], 1);
 }
 
-static int cmd_sendback(int argc, char **argv, struct client_info *c)
+static int cmd_sendback(int argc, char **argv, struct session_info *info)
 {
     union {
         struct sockaddr sa;
@@ -120,7 +120,7 @@ static int cmd_sendback(int argc, char **argv, struct client_info *c)
         return 1;
 
     slen = sizeof(saddr);
-    if (getpeername(c->sock, (struct sockaddr *)&saddr, &slen) == -1)
+    if (getpeername(info->sock, (struct sockaddr *)&saddr, &slen) == -1)
         return 1;
 
     switch (saddr.sa.sa_family) {
@@ -138,18 +138,18 @@ static int cmd_sendback(int argc, char **argv, struct client_info *c)
             return 1;
     }
 
-    return recvsend(DIR_SEND, c, asaddr, argv[1], argv[2], 1);
+    return recvsend(DIR_SEND, info, asaddr, argv[1], argv[2], 1);
 }
 
-static __newcmd struct cmd_info cmd1 = {
+static __newcmd struct cmd_desc cmd1 = {
     .name = "recv",
     .parse = cmd_recv,
 };
-static __newcmd struct cmd_info cmd2 = {
+static __newcmd struct cmd_desc cmd2 = {
     .name = "send",
     .parse = cmd_send,
 };
-static __newcmd struct cmd_info cmd3 = {
+static __newcmd struct cmd_desc cmd3 = {
     .name = "sendback",
     .parse = cmd_sendback,
 };
