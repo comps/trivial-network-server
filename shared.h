@@ -1,13 +1,10 @@
 #ifndef SHARED_H
 #define SHARED_H
 
-/** per-command structures **/
+/** constants **/
 
-/* client sock 'control mode' */
-enum sock_ctl_mode {
-    CTL_MODE_CONTROL,
-    CTL_MODE_BINARY,
-};
+
+/** generic structures **/
 
 /* command to be executed, with arguments parsed from control cmdline */
 struct cmd {
@@ -27,8 +24,8 @@ struct session_info {
     /* client connection socket, ie. for getsockname(),
      * may be overwritten by commands (ie. by 'detach' to -1) */
     int sock;
-    /* 'control mode' of the socket, how the parser itself uses it */
-    enum sock_ctl_mode sock_mode;
+    /* 'control socket output buffer' (cmd return values) */
+    char *ctl_outbuff;
     /* currently executed command (along with prev/next in a list) */
     struct cmd *cmd;
 };
@@ -61,7 +58,7 @@ extern struct cmd_desc __start_cmd_descs;
 extern struct cmd_desc __stop_cmd_descs;
 
 
-/** useful defines **/
+/** useful macros **/
 
 /* unused arguments in a function */
 #define UNUSED(a) (void)a

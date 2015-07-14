@@ -19,8 +19,8 @@
 /* maximum number of bytes the in-kernel socket buffer can hold for us,
  * used for MSG_PEEK, can be probably much higher, but don't risk anything */
 #define MSG_PEEK_MAX 16
-/* maximum size of the control socket return buffer, which holds command
- * names and their return values when we can't send these right away */
+/* maximum size of the control socket output buffer, which holds command
+ * names and their return values for delayed retrieval */
 #define CTL_OUTBUFF_MAX 8192
 
 /* cmd linked list management - the input control cmdline is parsed and
@@ -152,30 +152,13 @@ static int snprintfcat(char *str, size_t size, const char *format, ...)
     return rc;
 }
 
-/* write (fully or partially) a string to a socket, remove the written bytes
- * from the string (shifting it to the left) */
-static ssize_t write_str(int fd, char *str)
-{
-    ssize_t rc;
-    size_t len = strlen(str);
-    rc = write(fd, str, len);
-    /* on successful write, remove written bytes */
-    if (rc != -1)
-        memmove(str, str+rc, len-rc+1);  /* +1 is for '\0' */
-    return rc;
-}
-
 /* parse the control cmdline supplied by client, call individual cmds */
 static void process_ctl_cmdline(int clientfd, char *cmdline)
 {
     int rc;
-    char ctl_buff[CTL_OUTBUFF_MAX];
-
     char *args;
     struct cmd *cmd, *tmp = NULL;
     struct session_info info;
-
-    *ctl_buff = '\0';
 
     /* parse the control cmdline into a list */
     cmd = parse_cmds(cmdline);
@@ -185,19 +168,21 @@ static void process_ctl_cmdline(int clientfd, char *cmdline)
     /* prepare shared session info */
     memset(&info, 0, sizeof(struct session_info));
     info.sock = clientfd;
-    info.sock_mode = CTL_MODE_CONTROL;
+    info.ctl_outbuff = xmalloc(CTL_OUTBUFF_MAX);
+    *info.ctl_outbuff = '\0';
 
     /* for each command */
     while (cmd) {
         info.cmd = cmd;
         /* call the parser */
         rc = cmd->desc->parse(cmd->argc, cmd->argv, &info);
-        /* append "$rc $name" to the ctl outbuff and send it out */
+        if (rc < 0)
+            error_down("cmd %s raised a fatal error\n", cmd->argv[0]);
+        /* append "$rc $name" to the ctl outbuff */
         args = rebuild_args(cmd->argc, cmd->argv);
-        snprintfcat(ctl_buff, sizeof(ctl_buff), "%d %s\n", rc, args);
+        snprintfcat(info.ctl_outbuff, CTL_OUTBUFF_MAX, "%d %s\n", rc, args);
         free(args);
-        if (info.sock_mode == CTL_MODE_CONTROL && info.sock != -1)
-            write_str(info.sock, ctl_buff);
+        /* next command */
         tmp = cmd;
         cmd = cmd->next;
     }
@@ -210,6 +195,7 @@ static void process_ctl_cmdline(int clientfd, char *cmdline)
         free(cmd);
         cmd = tmp;
     }
+    free(info.ctl_outbuff);
 }
 
 /* read from a socket until delim is found/read

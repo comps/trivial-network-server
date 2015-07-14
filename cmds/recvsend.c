@@ -8,7 +8,7 @@
 #define MAX_DGRAM_SIZE 65536
 
 /* this command file provides cmds to send/recv data via a "side channel",
- * eg. newly created additional socket (bypassing client socket)
+ * eg. newly created additional socket (bypassing client control socket)
  *
  * recv - listen on the given ip version, l4 proto and port
  * send - send data to given addr, l4 proto and port
@@ -60,21 +60,11 @@ static int recvsend(enum dir dir, struct session_info *info,
          * we don't need to send anything back over the UDP socket */
         /* also, if the client sock is in binary mode, echo recv'd data */
         while (((stype == SOCK_DGRAM && dgrams-- > 0) || stype != SOCK_DGRAM)
-               && (bytes = read(s, buff, MAX_DGRAM_SIZE)) > 0)
-            if (info->sock != -1 && info->sock_mode == CTL_MODE_BINARY)
-                write(info->sock, buff, bytes);
+               && (bytes = read(s, buff, MAX_DGRAM_SIZE)) > 0);
         break;
     case DIR_SEND:
-        /* if the client sock is in binary mode, read data from it until read()
-         * returns 0 (client ended / sent empty packet on ^D),
-         * otherwise just send some random data */
-        if (info->sock_mode == CTL_MODE_BINARY) {
-            while ((bytes = read(info->sock, buff, MAX_DGRAM_SIZE)) > 0)
-                write(s, buff, bytes);
-        } else {
-            strcpy(buff, "lorem ipsum dolor sit amet\n");
-            write(s, buff, strlen(buff));
-        }
+        strcpy(buff, "lorem ipsum dolor sit amet\n");
+        write(s, buff, strlen(buff));
         break;
     default:
         goto err;

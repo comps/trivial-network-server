@@ -18,11 +18,8 @@
  * detach:
  * - close the client socket so that it "detaches"
  *
- * mode:
- * - sets the control mode:
- *   - in 'control', commands and their return codes are sent to client
- *   - in 'binary', the server doesn't interact with the socket at all,
- *     this is useful for ie. transferring binary files over the socket
+ * status:
+ * - print out the control socket output buffer (cmd return values)
  *
  * recv/send:
  * - uses unix domain sockets with SCM_RIGHTS to recv/send a new clientfd
@@ -31,7 +28,7 @@
 
 /* args:
  *   ctl-detach
- *   ctl-mode,<mode>
+ *   ctl-status
  *   ctl-recv,<string>
  *   ctl-send,<string>   # string should be unique, same for recv and send
  */
@@ -55,17 +52,25 @@ static int cmd_detach(int argc, char **argv, struct session_info *info)
     return 0;
 }
 
-static int cmd_mode(int argc, char **argv, struct session_info *info)
+/* write (fully or partially) a string to a socket, remove the written bytes
+ * from the string (shifting it to the left) */
+static ssize_t write_str(int fd, char *str)
 {
-    if (argc < 2)
-       return 1;
+    ssize_t rc;
+    size_t len = strlen(str);
+    rc = write(fd, str, len);
+    /* on successful write, remove written bytes */
+    if (rc != -1)
+        memmove(str, str+rc, len-rc+1);  /* +1 is for '\0' */
+    return rc;
+}
 
-    if (!strcmp(argv[1], "control"))
-        info->sock_mode = CTL_MODE_CONTROL;
-    else if (!strcmp(argv[1], "binary"))
-        info->sock_mode = CTL_MODE_BINARY;
-    else
+static int cmd_status(int argc, char **argv, struct session_info *info)
+{
+    if (info->sock == -1)
         return 1;
+
+    write_str(info->sock, info->ctl_outbuff);
 
     return 0;
 }
@@ -268,8 +273,8 @@ static __newcmd struct cmd_desc cmd1 = {
     .parse = cmd_detach,
 };
 static __newcmd struct cmd_desc cmd2 = {
-    .name = "ctl-mode",
-    .parse = cmd_mode,
+    .name = "ctl-status",
+    .parse = cmd_status,
 };
 static __newcmd struct cmd_desc cmd3 = {
     .name = "ctl-recv",

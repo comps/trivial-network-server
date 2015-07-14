@@ -11,7 +11,7 @@ The code should be easy enough to read, this README is just supplementary.
 
 ## CLIENT PROTOCOL ##
 
-It uses a simple text-based protocol (but can be switched to binary) initiated
+It uses a simple text-based protocol (but transfers data in binary!) initiated
 by the client by sending a newline-terminated "control cmdline" with commands
 separated by `;' (semicolon) and command arguments separated by `,' (comma).
 These characters are considered special and cannot be escaped. Any other
@@ -46,23 +46,12 @@ commands (!!).
 ## RETURN CODES ##
 
 The parse() function of each command can return any integer value, which is
-returned to the client as rc (return code) in the form of '$rc $cmd\n'
-via the client socket. This is useful for easy error checking, client-side,
-and harmless for binary transfer within a single command.
+held in a temporary buffer in the form of '$rc $cmd\n' and sent back to
+the client when requested via the `ctl-status' command.
 
-However there are uses for not returning these "control lines" back to
-the client, for which the "socket control mode" (sock_ctl_mode) was invented.
-Whenever client_info->sock_mode is CTL_MODE_CONTROL, these control lines
-are sent, when it's changed (ie. by a cmd) to CTL_MODE_BINARY, the control
-lines are *buffered* instead of being sent. The buffer is sent/emptied when
-the client socket is switched back to CTL_MODE_CONTROL.
-If the control cmdline provided by the client manage to end before the socket
-can be switched back to CONTROL, nothing is ever sent to the client.
-
-The 'ctl-mode' command is used for switching the socket modes.
-
-Returning a negative value from a command causes the ctl cmdline-parsing
-process to quit immediately without even sending return value of the cmd.
+Returning a negative value from a command parser causes the ctl cmdline-parsing
+process to quit immediately with a fatal error, without even being able to
+request statuses for previous commands.
 
 ## COMMAND PROGRAMMING INTERFACE ##
 
