@@ -153,7 +153,7 @@ static int snprintfcat(char *str, size_t size, const char *format, ...)
 }
 
 /* parse the control cmdline supplied by client, call individual cmds */
-static void process_ctl_cmdline(int clientfd, char *cmdline)
+static void process_ctl_cmdline(int *clientfd, char *cmdline)
 {
     int rc;
     char *args;
@@ -167,7 +167,7 @@ static void process_ctl_cmdline(int clientfd, char *cmdline)
 
     /* prepare shared session info */
     memset(&info, 0, sizeof(struct session_info));
-    info.sock = clientfd;
+    info.sock = *clientfd;
     info.ctl_outbuff = xmalloc(CTL_OUTBUFF_MAX);
     *info.ctl_outbuff = '\0';
 
@@ -186,6 +186,8 @@ static void process_ctl_cmdline(int clientfd, char *cmdline)
         tmp = cmd;
         cmd = cmd->next;
     }
+    /* might have changed */
+    *clientfd = info.sock;
 
     /* free allocated structures */
     cmd = cmd_list_rewind(tmp);
@@ -257,8 +259,10 @@ void process_client(int clientfd)
         buff[linesz-2] = '\0';
 
     /* parse the null-terminated control cmdline we just read */
-    process_ctl_cmdline(clientfd, buff);
+    process_ctl_cmdline(&clientfd, buff);
 
-    linger(clientfd, 1);
-    close(clientfd);
+    if (clientfd != -1) {
+        linger(clientfd, 1);
+        close(clientfd);
+    }
 }
