@@ -54,6 +54,16 @@ int create_socket(char *addr, char *port, int socktype, int server)
         goto err;
     }
 
+    /* disable automatic ::ffff:1.2.3.4 kernel-invoked binding as this server
+     * switches functionality based on what protocol the client used */
+    if (ainfo->ai_family == AF_INET6) {
+        rc = 1;
+        if (setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &rc, sizeof(rc)) == -1) {
+            perror("setsockopt");
+            goto err;
+        }
+    }
+
     if (server > 0) {
         if (bind(fd, ainfo->ai_addr, ainfo->ai_addrlen) == -1) {
             perror("bind");

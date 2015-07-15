@@ -2,7 +2,7 @@
 # setup:
 
 alias send-ns='nc localhost 1234'
-sudo ./ns2 0.0.0.0 1234   # for lock file & fd transfer
+sudo ./ns2 0.0.0.0 :: 1234 &   # for lock file & fd transfer
 
 #
 # examples:
