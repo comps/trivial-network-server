@@ -11,6 +11,10 @@
 #define VAR_RUN_DIR "/var/run/ns2"
 /* used for fd transfer unix sockets */
 #define FD_TRANSFER_PREFIX "fd-"
+/* maximum total length of socket path+filename */
+#ifndef PATH_MAX
+#define PATH_MAX 1024
+#endif
 
 /*
  * various helpers for managing the control cmdline (user interaction)
@@ -29,8 +33,8 @@
 /* args:
  *   ctl-detach
  *   ctl-status
- *   ctl-recv,<string>
- *   ctl-send,<string>   # string should be unique, same for recv and send
+ *   ctl-recv,[string]   # string should be unique, same for recv and send,
+ *   ctl-send,[string]   # remote address is used if left unspecified
  */
 
 static int cmd_detach(int argc, char **argv, struct session_info *info)
@@ -177,10 +181,17 @@ static int connect_unix(char *path)
 static int cmd_recv(int argc, char **argv, struct session_info *info)
 {
     int unixfd, fd;
-    char namebuf[128];
+    char *uniquestr;
+    char namebuf[PATH_MAX];
+    char remote_ascii[REMOTE_ADDRA_MAX];
 
-    if (argc < 2)
-        return 1;
+    if (argc >= 2) {
+        uniquestr = argv[1];
+    } else {
+        if (remote_addra(info->sock, remote_ascii) == -1)
+            return 1;
+        uniquestr = remote_ascii;
+    }
 
     /* if the old socket is still open, "detach" it */
     if (info->sock != -1) {
@@ -193,7 +204,7 @@ static int cmd_recv(int argc, char **argv, struct session_info *info)
 
     *namebuf = '\0';
     snprintf(namebuf, sizeof(namebuf), "%s/%s%s",
-             VAR_RUN_DIR, FD_TRANSFER_PREFIX, argv[1]);
+             VAR_RUN_DIR, FD_TRANSFER_PREFIX, uniquestr);
 
     unixfd = listen_unix(namebuf);
     if (unixfd == -1) {
@@ -235,17 +246,24 @@ static void cmd_recv_cleanup(void)
 static int cmd_send(int argc, char **argv, struct session_info *info)
 {
     int unixfd;
-    char namebuf[128];
+    char *uniquestr;
+    char namebuf[PATH_MAX];
+    char remote_ascii[REMOTE_ADDRA_MAX];
 
     if (info->sock == -1)
         return 1;
 
-    if (argc < 2)
-        return 1;
+    if (argc >= 2) {
+        uniquestr = argv[1];
+    } else {
+        if (remote_addra(info->sock, remote_ascii) == -1)
+            return 1;
+        uniquestr = remote_ascii;
+    }
 
     *namebuf = '\0';
     snprintf(namebuf, sizeof(namebuf), "%s/%s%s",
-             VAR_RUN_DIR, FD_TRANSFER_PREFIX, argv[1]);
+             VAR_RUN_DIR, FD_TRANSFER_PREFIX, uniquestr);
 
     unixfd = connect_unix(namebuf);
     if (unixfd == -1) {

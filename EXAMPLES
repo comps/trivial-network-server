@@ -20,10 +20,10 @@ cat /bin/bash | md5sum -                          # md5sum on our machine
 
 # combine the two above, sum a binary stream, interact per partes
 # - prepare the server, detach
-echo 'ctl-recv,blah;exec,summer;ctl-recv,blah;ctl-status;' | send-ns
+echo 'ctl-recv;exec,summer;ctl-recv;ctl-status;' | send-ns
 # - send / receive just the binary data to / from the summer
-{ echo 'ctl-send,blah;'; cat /bin/bash; } | send-ns
-# - locally check the sum (should be identocal)
+{ echo 'ctl-send'; cat /bin/bash; } | send-ns
+# - locally check the sum (should be identical)
 cat /bin/bash | md5sum -
 # - collect the return values from the server
-echo 'ctl-send,blah;' | send-ns
+echo 'ctl-send' | send-ns

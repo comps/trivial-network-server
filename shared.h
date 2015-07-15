@@ -78,7 +78,10 @@ void *xrealloc(void *, size_t);
 ssize_t xrecv(int, void *, size_t, int);
 void (*xsignal(int, void (*)(int)))(int);
 int linger(int sock, int op);
-/* ELF section parsers / iterators from shared.c */
+
+/* generic helpers from shared.c */
+#define REMOTE_ADDRA_MAX 46 /* should hold about anything */
+int remote_addra(int sock, char *dest);
 struct cmd_desc *cmd_descs_iterate(struct cmd_desc *);
 
 /* helper functions from main.c */

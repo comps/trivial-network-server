@@ -45,6 +45,7 @@ static int parse(int argc, char **argv, struct session_info *info)
     pid_t childpid;
     char **newargv;
     char execpath[MAX_PATH_LEN];
+    char remoteaddr[13+REMOTE_ADDRA_MAX] = "REMOTE_ADDR=";
 
     if (argc < 2)
         return ERR_RET;
@@ -62,6 +63,10 @@ static int parse(int argc, char **argv, struct session_info *info)
 
     newargv = append_zero_elem(argv, argc);
 
+    if (info->sock != -1)
+        if (remote_addra(info->sock, remoteaddr+strlen(remoteaddr)) == -1)
+            return ERR_RET;
+
     childpid = fork();
     switch (childpid) {
         case -1:
@@ -73,18 +78,20 @@ static int parse(int argc, char **argv, struct session_info *info)
              * fds (by other commands) for the exec'd command to use */
             if (info->sock != -1) {
                 if (close(STDIN_FILENO) == -1 || close(STDOUT_FILENO) == -1)
-                    exit(ERR_RET);
+                    exit(-1);
                 if (dup2(info->sock, STDIN_FILENO) == -1)
-                    exit(ERR_RET);
+                    exit(-1);
                 if (dup2(info->sock, STDOUT_FILENO) == -1)
-                    exit(ERR_RET);
+                    exit(-1);
+                if (putenv(remoteaddr))
+                    exit(-1);
             }
 
             /* load new executable image */
             execv(execpath, newargv+1);
 
             /* exec failed */
-            exit(ERR_RET);
+            exit(-1);
 
         default:
             break;

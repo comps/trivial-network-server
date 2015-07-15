@@ -7,6 +7,7 @@
 #include <stdarg.h>
 #include <signal.h>
 #include <sys/socket.h>
+#include <arpa/inet.h>
 
 #include "shared.h"
 
@@ -80,6 +81,37 @@ int linger(int sock, int op)
 {
     return setsockopt(sock, SOL_SOCKET, SO_LINGER,
                &(struct linger){!op, 0}, sizeof(struct linger));
+}
+
+/* get addr of the remote socket as a string (inet_ntoa format)
+ * and store it in an external dest buffer */
+int remote_addra(int sock, char *dest)
+{
+    union {
+        struct sockaddr sa;
+        struct sockaddr_in in;
+        struct sockaddr_in6 in6;
+    } saddr;
+    socklen_t slen;
+
+    slen = sizeof(saddr);
+    if (getpeername(sock, (struct sockaddr *)&saddr, &slen) == -1)
+        return -1;
+
+    switch (saddr.sa.sa_family) {
+        case AF_INET:
+            if (inet_ntop(AF_INET, &saddr.in.sin_addr, dest, slen) == NULL)
+                return -1;
+            break;
+        case AF_INET6:
+            if (inet_ntop(AF_INET6, &saddr.in6.sin6_addr, dest, slen) == NULL)
+                return -1;
+            break;
+        default:
+            return -1;
+    }
+
+    return 0;
 }
 
 /* iterate over cmd descs in the cmds ELF section */

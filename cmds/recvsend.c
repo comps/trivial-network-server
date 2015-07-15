@@ -98,37 +98,15 @@ static int cmd_send(int argc, char **argv, struct session_info *info)
 
 static int cmd_sendback(int argc, char **argv, struct session_info *info)
 {
-    union {
-        struct sockaddr sa;
-        struct sockaddr_in in;
-        struct sockaddr_in6 in6;
-    } saddr;
-    socklen_t slen;
-    char asaddr[INET6_ADDRSTRLEN];  /* covers INET4 as well */
+    char remote[REMOTE_ADDRA_MAX];
 
     if (argc < 3)
         return 1;
 
-    slen = sizeof(saddr);
-    if (getpeername(info->sock, (struct sockaddr *)&saddr, &slen) == -1)
+    if (remote_addra(info->sock, remote) == -1)
         return 1;
 
-    switch (saddr.sa.sa_family) {
-        case AF_INET:
-            if (inet_ntop(AF_INET, &saddr.in.sin_addr, asaddr, slen) == NULL)
-                return 1;
-            break;
-
-        case AF_INET6:
-            if (inet_ntop(AF_INET6, &saddr.in6.sin6_addr, asaddr, slen) == NULL)
-                return 1;
-            break;
-
-        default:
-            return 1;
-    }
-
-    return recvsend(DIR_SEND, info, asaddr, argv[1], argv[2], 1);
+    return recvsend(DIR_SEND, info, remote, argv[1], argv[2], 1);
 }
 
 static __newcmd struct cmd_desc cmd1 = {

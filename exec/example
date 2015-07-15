@@ -1,5 +1,6 @@
 #!/bin/sh
 echo "This is example command!"
+echo "REMOTE_ADDR: $REMOTE_ADDR"
 for arg in "$@"; do
 	echo "Got arg: $arg"
 done
