@@ -38,15 +38,7 @@ static int cmd_detach(int argc, char **argv, struct session_info *info)
     if (info->sock == -1)
         return 1;
 
-    if (argc > 1 && !strcmp(argv[1], "force")) {
-        /* send RST or otherwise "forcibly" close the connection,
-         * (results in ECONNRESET on client, making nmap-ncat *really* exit) */
-        setsockopt(info->sock, SOL_SOCKET, SO_LINGER,
-                   &(struct linger){1, 0}, sizeof(struct linger));
-    } else {
-        /* clean, with default background linger */
-        shutdown(info->sock, SHUT_RDWR);
-    }
+    linger(info->sock, 1);
     close(info->sock);
     info->sock = -1;
     return 0;
@@ -190,6 +182,12 @@ static int cmd_recv(int argc, char **argv, struct session_info *info)
     if (argc < 2)
         return 1;
 
+    /* if the old socket is still open, "detach" it */
+    if (info->sock != -1) {
+        linger(info->sock, 1);
+        close(info->sock);
+    }
+
     /* okay to fail if the dir already exists */
     mkdir(VAR_RUN_DIR, 0750);
 
@@ -207,8 +205,8 @@ static int cmd_recv(int argc, char **argv, struct session_info *info)
         perror("recv_fd");
         return -1;  /* cannot afford to continue */
     }
-
     unlink(namebuf);
+
     info->sock = fd;
     return 0;
 }

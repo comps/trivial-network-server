@@ -73,6 +73,14 @@ void (*xsignal(int signum, void (*newhandler)(int)))(int)
         perror_down("sigaction");
     return oldact.sa_handler;
 }
+/* disable/enable background socket linger,
+ * when disabled, close() without shutdown() sends back RST (if TCP),
+ * when enabled, close() lingers in the background (linux default) */
+int linger(int sock, int op)
+{
+    return setsockopt(sock, SOL_SOCKET, SO_LINGER,
+               &(struct linger){!op, 0}, sizeof(struct linger));
+}
 
 /* iterate over cmd descs in the cmds ELF section */
 struct cmd_desc *cmd_descs_iterate(struct cmd_desc *itr)

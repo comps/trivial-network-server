@@ -77,6 +77,7 @@ void *xmalloc(size_t);
 void *xrealloc(void *, size_t);
 ssize_t xrecv(int, void *, size_t, int);
 void (*xsignal(int, void (*)(int)))(int);
+int linger(int sock, int op);
 /* ELF section parsers / iterators from shared.c */
 struct cmd_desc *cmd_descs_iterate(struct cmd_desc *);
 

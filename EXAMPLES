@@ -8,9 +8,9 @@ sudo ./ns2 0.0.0.0 1234   # for lock file & fd transfer
 # examples:
 
 # run a command (echo) with "binary" output
-echo 'echo,test1;ctl-detach;ctl-recv,somestr;ctl-status;' | send-ns > out.bin
+echo 'echo,test1;ctl-recv,somestr;ctl-status;' | send-ns > out.bin
 # get its return code
-echo 'ctl-send,somestr' | send-ns | grep '^echo'
+echo 'ctl-send,somestr' | send-ns
 
 # run an external command, passing binary input
 # (see what exec/summer does first)
@@ -20,7 +20,7 @@ cat /bin/bash | md5sum -                          # md5sum on our machine
 
 # combine the two above, sum a binary stream, interact per partes
 # - prepare the server, detach
-echo 'ctl-detach;ctl-recv,blah;exec,summer;ctl-detach;ctl-recv,blah;ctl-status;' | send-ns
+echo 'ctl-recv,blah;exec,summer;ctl-recv,blah;ctl-status;' | send-ns
 # - send / receive just the binary data to / from the summer
 { echo 'ctl-send,blah;'; cat /bin/bash; } | send-ns
 # - locally check the sum (should be identocal)

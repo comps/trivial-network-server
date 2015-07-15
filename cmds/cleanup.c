@@ -11,6 +11,7 @@
 static int parse(int argc, char **argv, struct session_info *info)
 {
     UNUSED3(argc, argv, info);
+    linger(info->sock, 1);
     kill(getppid(), SIGHUP);
     
     /* there's nothing more we can reliably do here, we might have enough

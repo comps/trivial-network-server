@@ -242,10 +242,8 @@ void process_client(int clientfd)
     char buff[CTL_CMDLINE_MAX];
     ssize_t linesz;
 
-    /* make any unexpected connection termination result in (hopefully) TCP RST
-     * sent to the client, hoping the client can detect the unexpected error */
-    setsockopt(clientfd, SOL_SOCKET, SO_LINGER,
-               &(struct linger){1, 0}, sizeof(struct linger));
+    /* let client detect unexpected errors (as conn reset) */
+    linger(clientfd, 0);
 
     /* read the control cmdline, zero the delimiter(s) */
     linesz = sockread_until(clientfd, buff, sizeof(buff), '\n');
@@ -261,6 +259,6 @@ void process_client(int clientfd)
     /* parse the null-terminated control cmdline we just read */
     process_ctl_cmdline(clientfd, buff);
 
-    shutdown(clientfd, SHUT_RDWR);
+    linger(clientfd, 1);
     close(clientfd);
 }
