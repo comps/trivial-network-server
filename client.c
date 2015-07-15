@@ -31,6 +31,7 @@ cmd_list_add(struct cmd *c, int argc, char **argv, struct cmd_desc *desc)
     struct cmd *newcmd;
 
     newcmd = xmalloc(sizeof(struct cmd));
+    memset(newcmd, 0, sizeof(struct cmd));
     newcmd->argc = argc;
     newcmd->argv = argv;
     newcmd->desc = desc;
