@@ -55,6 +55,7 @@ static ssize_t write_str(int fd, char *str)
 
 static int cmd_status(int argc, char **argv, struct session_info *info)
 {
+    UNUSED2(argc, argv);
     if (info->sock == -1)
         return 1;
 
@@ -114,6 +115,7 @@ static int cmd_loop(int argc, char **argv, struct session_info *info)
 
 static int cmd_detach(int argc, char **argv, struct session_info *info)
 {
+    UNUSED2(argc, argv);
     if (info->sock == -1)
         return 1;
 

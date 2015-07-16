@@ -30,6 +30,7 @@ enum dir {
 static int recvsend(enum dir dir, struct session_info *info,
                     char *addr, char *proto, char *port, int dgrams)
 {
+    UNUSED(info);
     int s = -1, cs;
     int stype;
 

@@ -48,6 +48,7 @@ static int cmd_cmds(int argc, char **argv, struct session_info *info)
 
 static int cmd_fail(int argc, char **argv, struct session_info *info)
 {
+    UNUSED(info);
     if (argc >= 2)
         return atoi(argv[1]);
     return -1;

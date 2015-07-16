@@ -4,7 +4,7 @@ include $(TOPDIR)/rules.mk
 
 ALL_EXE		= ns2
 
-ns2: CFLAGS += -std=gnu99 -pedantic -I$(CURDIR)
+ns2: CFLAGS += -Wextra -std=gnu99 -pedantic -I$(CURDIR)
 ns2: LDFLAGS += -lselinux
 
 ns2: shared.c main.c client.c cleanup.c cmds/*.c
