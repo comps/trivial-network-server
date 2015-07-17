@@ -4,7 +4,8 @@ include $(TOPDIR)/rules.mk
 
 ALL_EXE		= ns2
 
-ns2: CFLAGS += -Wextra -std=gnu99 -pedantic -I$(CURDIR)
+# maybe-uninitialized disabled due to numerous gcc bugs // false positives
+ns2: CFLAGS += -Wextra -std=gnu99 -pedantic -I$(CURDIR) -Wno-maybe-uninitialized
 ns2: LDFLAGS += -lselinux
 
 ns2: shared.c main.c client.c cleanup.c cmds/*.c
