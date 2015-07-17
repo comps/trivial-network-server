@@ -23,6 +23,9 @@
 /* maximum size of the control socket output buffer, which holds command
  * names and their return values for delayed retrieval */
 #define CTL_OUTBUFF_MAX 16384
+/* default maximum life time for clients - to guard against hung up connections,
+ * - can (and should) be overwritten using the `timeout' command */
+#define CLIENT_MAX_LIFE 86400  /* 1 day */
 
 /* cmd linked list management - the input control cmdline is parsed and
  * transformed using these functions into a linked list before execution */
@@ -321,6 +324,10 @@ void process_client(int clientfd)
 
     /* let client detect unexpected errors (as conn reset) */
     linger(clientfd, 0);
+
+    /* set default client lifetime */
+    if (death_timer(CLIENT_MAX_LIFE) == -1)
+        perror_down("death_timer");
 
     sockread_line(clientfd, buff, sizeof(buff));
 

@@ -97,4 +97,7 @@ void process_client(int);
 void cleanup_sig_handler(int);
 void cleanup_exit_handler(int);
 
+/* defined by various commands, useful elsewhere */
+int death_timer(int seconds);
+
 #endif /* SHARED_H */
