@@ -29,7 +29,7 @@
  *   if < 0, don't do bind, listen or connect */
 int create_socket(char *addr, char *port, int socktype, int server)
 {
-    int rc, fd;
+    int rc, fd = -1;
     struct addrinfo *ainfo, hints;
 
     memset(&hints, 0, sizeof(struct addrinfo));
@@ -86,6 +86,7 @@ int create_socket(char *addr, char *port, int socktype, int server)
 
     return fd;
 err:
+    close(fd);
     freeaddrinfo(ainfo);
     return -1;
 }
