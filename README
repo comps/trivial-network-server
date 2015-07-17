@@ -134,12 +134,6 @@ waiting, new clients can freely connect with a shared lock, meaning the request
 for exclusive access can easily starve. This can't be reasonably fixed, the one
 client will simply have to wait until all others are done.
 
-A shared lock can be upgraded to exclusive and exclusive can be downgraded
-back to shared, using the `lock' and `unlock' commands:
-
-- lock (no lock -> shared -> exclusive)    - upgrade a lock
-- unlock (exclusive -> shared -> no lock)  - downgrade a lock
-
 ## PERSISTENT SESSIONS ##
 
 Normally, the (forked) server accepts only a single control command line, parses

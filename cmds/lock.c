@@ -6,17 +6,26 @@
 #include <sys/file.h>
 #include "shared.h"
 
-#define GLOBAL_LOCK_FILE "/var/lock/ns2.lock"
+#define GLOBAL_LOCK_FILE "./ns2.lock"
 
-/* gain/release or up/downgrade a lock over the entire server */
+/* gain/release or up/downgrade a lock over the entire server
+ *
+ * - with explicit action:
+ *   - `lock,sh' / `lock,ex' takes a shared/exclusive lock
+ *   - `unlock,all' unlocks any lock
+ *
+ * - without specified action:
+ *   - `lock' upgrades a lock (no lock -> shared -> exclusive)
+ *   - `unlock' downgrades a lock (exclusive -> shared -> no lock)
+ */
 
 /* args:
  *   lock,[sh|ex],[nonblock]
- *   unlock
+ *   unlock,[all]
  */
 
 static int lockfd = -1;
-static int lock_type = 0;
+static int lock_held = 0;
 
 static int cmd_lock(int argc, char **argv, struct session_info *info)
 {
@@ -51,19 +60,24 @@ static int cmd_lock(int argc, char **argv, struct session_info *info)
      * - if a shared lock is held, upgrade to exclusive
      */
     if (!(type & (LOCK_SH | LOCK_EX))) {
-        if (!lock_type)
+        if (!lock_held) {
             type |= LOCK_SH;
-        else if (lock_type & LOCK_SH)
+        } else if (lock_held & LOCK_SH) {
             type |= LOCK_EX;
+        } else if (lock_held & LOCK_EX) {
+            type |= LOCK_EX;
+        }
     }
 
     if (flock(lockfd, type) == -1) {
-        if (errno == EWOULDBLOCK)
+        if (errno == EWOULDBLOCK) {
             return 2;  /* lock is already held */
-        else
+        } else {
+            perror("lock");
             return -1;  /* dangerous to go on without a lock */
+        }
     }
-    lock_type = type & (LOCK_SH | LOCK_EX);
+    lock_held = type & (LOCK_SH | LOCK_EX);
 
     return 0;
 }
@@ -73,18 +87,25 @@ static int cmd_unlock(int argc, char **argv, struct session_info *info)
     UNUSED3(argc, argv, info);
     int op;
 
-    /* just downgrade the lock:
-     * - if an exclusive lock is held, downgrade it to shared
-     * - if a shared lock is held, unlock
-     */
-    if (lock_type & LOCK_EX)
-        op = LOCK_SH;
-    else
+    if (argc >= 2 && !strcmp(argv[1], "all")) {
         op = LOCK_UN;
+    } else {
+        /* just downgrade the lock:
+         * - if an exclusive lock is held, downgrade it to shared
+         * - if a shared lock is held, unlock
+         */
+        if (lock_held & LOCK_EX)
+            op = LOCK_SH;
+        else
+            op = LOCK_UN;
+    }
 
     if (flock(lockfd, op) == -1) {
+        perror("unlock");
         return -1;  /* continuing could cause deadlock! */
     }
+
+    lock_held = op & LOCK_SH;
 
     return 0;
 }
