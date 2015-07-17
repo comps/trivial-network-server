@@ -10,6 +10,7 @@
 #include <stdarg.h>
 #include <unistd.h>
 #include <sys/socket.h>
+#include <arpa/inet.h>
 #include <sys/file.h>
 
 #include "shared.h"
@@ -154,41 +155,27 @@ static int snprintfcat(char *str, size_t size, const char *format, ...)
 }
 
 /* parse the control cmdline supplied by client, call individual cmds */
-static void process_ctl_cmdline(int *clientfd, char *cmdline)
+static void process_cmds(struct session_info *sinfo, struct cmd *cmd)
 {
     int rc;
     char *args;
-    struct cmd *cmd, *tmp = NULL;
-    struct session_info info;
-
-    /* parse the control cmdline into a list */
-    cmd = parse_cmds(cmdline);
-    if (!cmd)
-        error_down("no cmds on the ctl cmdline\n");
-
-    /* prepare shared session info */
-    memset(&info, 0, sizeof(struct session_info));
-    info.sock = *clientfd;
-    info.ctl_outbuff = xmalloc(CTL_OUTBUFF_MAX);
-    *info.ctl_outbuff = '\0';
+    struct cmd *tmp = NULL;
 
     /* for each command */
     while (cmd) {
-        info.cmd = cmd;
+        sinfo->cmd = cmd;
         /* call the parser */
-        rc = cmd->desc->parse(cmd->argc, cmd->argv, &info);
+        rc = cmd->desc->parse(cmd->argc, cmd->argv, sinfo);
         if (rc < 0)
             error_down("cmd %s raised a fatal error\n", cmd->argv[0]);
         /* append "$rc $name" to the ctl outbuff */
         args = rebuild_args(cmd->argc, cmd->argv);
-        snprintfcat(info.ctl_outbuff, CTL_OUTBUFF_MAX, "%d %s\n", rc, args);
+        snprintfcat(sinfo->ctl_outbuff, CTL_OUTBUFF_MAX, "%d %s\n", rc, args);
         free(args);
         /* next command */
         tmp = cmd;
         cmd = cmd->next;
     }
-    /* might have changed */
-    *clientfd = info.sock;
 
     /* free allocated structures */
     cmd = cmd_list_rewind(tmp);
@@ -198,7 +185,6 @@ static void process_ctl_cmdline(int *clientfd, char *cmdline)
         free(cmd);
         cmd = tmp;
     }
-    free(info.ctl_outbuff);
 }
 
 /* read from a socket until delim is found/read
@@ -239,31 +225,146 @@ sockread_until(int fd, char *rcvbuff, size_t buffsiz, char delimchr)
     return -1;
 }
 
+/* read exactly one line from socket, take care of client-specifics */
+static ssize_t sockread_line(int fd, char *rcvbuff, size_t buffsiz)
+{
+    ssize_t linesz;
+
+    linesz = sockread_until(fd, rcvbuff, buffsiz, '\n');
+    if (linesz == -1)
+        error_down("read line too big (%d+ bytes)\n", buffsiz);
+    else if (linesz < 1)
+        error_down("read line is empty\n");
+    rcvbuff[linesz-1] = '\0';
+
+    /* for telnet & others - if next-to-last chr is \r, zero it too */
+    if (linesz > 1 && rcvbuff[linesz-2] == '\r') {
+        linesz--;
+        rcvbuff[linesz-1] = '\0';
+    }
+
+    return linesz;
+}
+
+/* copy a (possibly connected) socket into a new, listening one, copying the
+ * addr structure and selecting a random port to listen on */
+static int sock_ctol(int sock, int backlog, int *port)
+{
+    union {
+        struct sockaddr sa;
+        struct sockaddr_in in;
+        struct sockaddr_in6 in6;
+    } saddr;
+    socklen_t slen;
+    int lsock, domain, type, proto;
+
+    slen = sizeof(int);
+    if (getsockopt(sock, SOL_SOCKET, SO_DOMAIN, &domain, &slen) == -1)
+        return -1;
+    slen = sizeof(int);
+    if (getsockopt(sock, SOL_SOCKET, SO_TYPE, &type, &slen) == -1)
+        return -1;
+    slen = sizeof(int);
+    if (getsockopt(sock, SOL_SOCKET, SO_PROTOCOL, &proto, &slen) == -1)
+        return -1;
+    slen = sizeof(saddr);
+    if (getsockname(sock, (struct sockaddr *)&saddr, &slen) == -1)
+        return -1;
+
+    switch (saddr.sa.sa_family) {
+        case AF_INET:   saddr.in.sin_port = 0; break;
+        case AF_INET6:  saddr.in6.sin6_port = 0; break;
+        default:        return -1;
+    }
+
+    lsock = socket(domain, type, proto);
+    if (lsock < 0)
+        return -1;
+
+    if (bind(lsock, &saddr.sa, slen) == -1)
+        goto err;
+
+    if (type == SOCK_STREAM || type == SOCK_SEQPACKET) {
+        if (listen(lsock, backlog) == -1)
+            goto err;
+    }
+
+    if (port) {
+        slen = sizeof(saddr);
+        if (getsockname(lsock, (struct sockaddr *)&saddr, &slen) == -1)
+            goto err;
+        switch (saddr.sa.sa_family) {
+            case AF_INET:   *port = ntohs(saddr.in.sin_port); break;
+            case AF_INET6:  *port = ntohs(saddr.in6.sin6_port); break;
+            default:        goto err;
+        }
+    }
+
+    return lsock;
+
+err:
+    close(lsock);
+    return -1;
+}
+
 /* handle basic input/output client interaction */
 void process_client(int clientfd)
 {
     char buff[CTL_CMDLINE_MAX];
-    ssize_t linesz;
+    struct session_info sinfo;
+    struct cmd *cmds;
+    int lsock, lport;
 
     /* let client detect unexpected errors (as conn reset) */
     linger(clientfd, 0);
 
-    /* read the control cmdline, zero the delimiter(s) */
-    linesz = sockread_until(clientfd, buff, sizeof(buff), '\n');
-    if (linesz == -1)
-        error_down("control cmdline too big (%d+ bytes)\n", sizeof(buff));
-    /* FIXME: should be buff[linesz-1], but gcc 4.8 doesn't like it,
-     * despite linesz being always >0 here */
-    *(buff+linesz-1) = '\0';
-    /* for telnet & others - if next-to-last chr is \r, zero it too */
-    if (linesz > 1 && buff[linesz-2] == '\r')
-        buff[linesz-2] = '\0';
+    sockread_line(clientfd, buff, sizeof(buff));
 
-    /* parse the null-terminated control cmdline we just read */
-    process_ctl_cmdline(&clientfd, buff);
+    /* prepare shared session info */
+    memset(&sinfo, 0, sizeof(struct session_info));
+    sinfo.sock = clientfd;
+    sinfo.ctl_outbuff = xmalloc(CTL_OUTBUFF_MAX);
+    *sinfo.ctl_outbuff = '\0';
 
-    if (clientfd != -1) {
+    /* new session requested - multi-cmdline client */
+    if (!strcmp(buff, "SESSION")) {
+        /* start listening, send port nr. to client */
+        lsock = sock_ctol(clientfd, 10, &lport);
+        if (lsock == -1)
+            perror_down("session listener");
+        dprintf(clientfd, "%d\n", lport);
         linger(clientfd, 1);
         close(clientfd);
+
+        sinfo.active = 1;
+        while (sinfo.active) {
+            sinfo.sock = accept(lsock, NULL, NULL);
+            if (sinfo.sock == -1)
+                perror("session accept");
+            linger(sinfo.sock, 0);
+            /* read control cmdline */
+            sockread_line(sinfo.sock, buff, sizeof(buff));
+            /* parse it into cmds */
+            cmds = parse_cmds(buff);
+            if (!cmds)
+                error_down("no cmds on the ctl cmdline\n");
+            /* execute them */
+            process_cmds(&sinfo, cmds);
+            linger(sinfo.sock, 1);
+            close(sinfo.sock);
+        }
+
+    /* simple single-cmdline client */
+    } else {
+        /* parse previously read control cmdline into cmds */
+        cmds = parse_cmds(buff);
+        if (!cmds)
+            error_down("no cmds on the ctl cmdline\n");
+        /* execute them */
+        process_cmds(&sinfo, cmds);
+        linger(sinfo.sock, 1);
+        close(sinfo.sock);
     }
+
+    free(sinfo.ctl_outbuff);
 }

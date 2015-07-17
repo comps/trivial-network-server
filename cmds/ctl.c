@@ -20,11 +20,18 @@
 /*
  * various helpers for managing the control cmdline (user interaction)
  *
+ * status:
+ * - print out the control socket output buffer (cmd return values)
+ *
+ * loop:
+ * - loops last [lastcmds] commands [loops] times
+ *
  * detach:
  * - close the client socket so that it "detaches"
  *
- * status:
- * - print out the control socket output buffer (cmd return values)
+ * end:
+ * - mark the session as inactive, causing it to end after the current
+ *   ctl cmdline finishes
  *
  * recv/send:
  * - uses unix domain sockets with SCM_RIGHTS to recv/send a new clientfd
@@ -36,6 +43,7 @@
  *   ctl-loop,[loops],[lastcmds]  # "loops" defaults to -1 (infinite loop),
  *                                # "lastcmds" defaults to all previous
  *   ctl-detach
+ *   ctl-end
  *   ctl-recv,[string]   # string should be unique, same for recv and send,
  *   ctl-send,[string]   # remote address is used if left unspecified
  */
@@ -122,6 +130,13 @@ static int cmd_detach(int argc, char **argv, struct session_info *info)
     linger(info->sock, 1);
     close(info->sock);
     info->sock = -1;
+    return 0;
+}
+
+static int cmd_end(int argc, char **argv, struct session_info *info)
+{
+    UNUSED2(argc, argv);
+    info->active = 0;
     return 0;
 }
 
@@ -350,11 +365,15 @@ static __newcmd struct cmd_desc cmd3 = {
     .parse = cmd_detach,
 };
 static __newcmd struct cmd_desc cmd4 = {
+    .name = "ctl-end",
+    .parse = cmd_end,
+};
+static __newcmd struct cmd_desc cmd5 = {
     .name = "ctl-recv",
     .parse = cmd_recv,
     .cleanup = cmd_recv_cleanup,
 };
-static __newcmd struct cmd_desc cmd5 = {
+static __newcmd struct cmd_desc cmd6 = {
     .name = "ctl-send",
     .parse = cmd_send,
 };

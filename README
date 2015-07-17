@@ -17,7 +17,7 @@ separated by `;' (semicolon) and command arguments separated by `,' (comma).
 These characters are considered special and cannot be escaped. Any other
 characters (excl. newline) are non-special and treated equally (incl. spaces).
 
-Why not use spaces?
+Q: Why not use spaces?
 This leads to hell. When using spaces, the user expects a shell-like behavior,
 like treating multiple spaces as one, escape support, escape of the escape char,
 argument quoting, etc. By using commas and semicolons, we break the habit of
@@ -27,7 +27,7 @@ The cmdline is parsed in each fork()ed child separately and commands are
 executed one by one, from left to right. When the cmdline reaches its end,
 the client socket is closed and the child exits.
 
-Why not read another cmdline?
+Q: Why not read another cmdline?
 Partly because we would need to always specify an exit-like command, even for
 simple cmdlines, but mainly because we allow the commands to treat the client
 socket as a text/binary input/output for their purposes - when a command was
@@ -53,11 +53,15 @@ Returning a negative value from a command parser causes the ctl cmdline-parsing
 process to quit immediately with a fatal error, without even being able to
 request statuses for previous commands.
 
+Whenever a fatal error or other server-specific internal error occurs, the
+TCP connection is forcefuly reset (TCP RST), allowing the client to detect
+a remote error.
+
 ## COMMAND PROGRAMMING INTERFACE ##
 
 See any of the simple commands like 'echo' or 'cat' on how you can make your
 own command. The mandatory thing is to provide a parse() function, which we
-call with a client_info structure, specifying the client socket, argc+argv
+call with a session_info structure, specifying the client socket, argc+argv
 the user specified on the control cmdline and more. This function is the core
 of your command - you can define more helper functions (as static!) if you like.
 You can also provide your own cleanup() function, see CLEANUP below.
@@ -82,18 +86,19 @@ VERY IMPORTANT facts about running cleanup:
   non-const variables modified after installing the signal handler (sigaction)
   because any such variables might be partially written (ie. 4 out of 8 bytes)
   when the signal/interrupt is received
+  - an exception to this is "volatile sig_atomic_t" variable
 - all per-command cleanup() functions are subject to signal handler limitations,
   meaning you can't use variables from normal command runtime
 - all per-command cleanup() functions are executed from the listening server
   process (its signal handler), meaning any syscalls are executed as
   the listening server, NOT its command-parsing child, ie. getpid() returns
-  the listening processes' pid, not the pid of the per-command parsing process
+  the listening server pid, not the pid of the per-command parsing process
   - this - by extension - means that all cleanups need to be very generic and
     clean up everything possibly left by any number of instances of the same
     command from any number of clients - cleanups affect all connected clients
-    - ie. 5 clients, each doing 'exec' cmd - the cleanup is executed only once,
-      but it needs to kill all processes spawned by all 5 exec cmds from all
-      clients
+    - ie. 5 clients, each doing 'exec' cmd - the cleanup is executed only
+      *once*, but it needs to kill all processes spawned by all 5 exec cmds
+      from all clients
 
 When to use cleanup?
 You should really never need to use cleanup. The only exception is manual
@@ -106,14 +111,13 @@ disconnect any legitimate clients waiting for unlock.
 Locking is a manual, voluntary action in this implementation (instead of
 a mandatory one) for variety of reasons:
 
-- flexibility, cmd-send/recv - only the client knows which new tcp connection
-  starts a whole new "session" and which re-attaches to a previous one - forcing
-  lock on the reattachment section if the original one holds an exclusive lock
-  would result in a deadlock
+- flexibility - locking is a usecase-based logic, a client might lock the server
+  and then initiate an arbitrary number of additional connections to it, before
+  finishing the (complex/composite) task at hand and unlocking the server
 
-- critical cleanup - when a session doing (infinitely long) recv() dies, holding
-  an exclusive lock, there's no way to remotely cleanup the server, because any
-  attempt to connect will block on the lock
+- critical cleanup - when a connection doing (infinitely long) recv() dies,
+  holding an exclusive lock, there's no way to remotely cleanup the server,
+  because any attempt to connect will block on the lock
 
 - mandatory blocking - the client can't check beforehand if the server is locked
   and voluntarily decide to give up - the server just grabs the connection and
@@ -125,15 +129,41 @@ Therefore it's up to the clients to lock the server with a shared lock on each
 new connection, giving them the ability to do it the non-blocking way, with the
 option to opt-out in critical situations.
 
-Note that - in this flock() implementation - while `lock' is waiting, new
-clients can freely connect with a shared lock, meaning the request for exclusive
-access can easily starve. This can't be easily fixed, the one client will simply
-have to wait until all others are done.
+Note that - in this flock() implementation - while exclusive lock attempt is
+waiting, new clients can freely connect with a shared lock, meaning the request
+for exclusive access can easily starve. This can't be reasonably fixed, the one
+client will simply have to wait until all others are done.
 
 A shared lock can be upgraded to exclusive and exclusive can be downgraded
 back to shared, using the `lock' and `unlock' commands:
 
 - lock (no lock -> shared -> exclusive)    - upgrade a lock
 - unlock (exclusive -> shared -> no lock)  - downgrade a lock
+
+## PERSISTENT SESSIONS ##
+
+Normally, the (forked) server accepts only a single control command line, parses
+it into commands and executes them, closing the connection and the session once
+the cmdline ends.
+The client can however request a "persistent" session which goes back to the
+listening state when the cmdline ends, accepting and executing new commands,
+still within the same process, sharing certain data between connections
+(ie. stored cmd return values).
+
+A client can request a persistent session creation by sending the (uppercase)
+word SESSION, followed by a newline, to the server, in stead of the ctl cmdline.
+The server replies with a number, followed by a newline, indicating the
+listening port of the session. The client can then communicate on this port with
+the server instead of the primary server process, sending commands in multiple
+connections, collecting command status and finally exiting the session using
+the `ctl-end' command.
+
+Q: Don't multiple cmdlines break the binary data flow?
+An earlier section described that the server won't ever read anything beyond
+the first control cmdline, because it could interfere with commands transferring
+binary data and it would be impossible for the server to distinguish where the
+binary data end and cmdline begins.
+This is not an issue here - we still allow only one cmdline *per connection*,
+which is fine, because the binary flow ends with the connection.
 
 # vim: syntax=off :

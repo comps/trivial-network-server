@@ -28,6 +28,9 @@ struct session_info {
     char *ctl_outbuff;
     /* currently executed command (along with prev/next in a list) */
     struct cmd *cmd;
+    /* is the session active? if not, it will be closed (finished)
+     * after the current cmd list ends */
+    int active;
 };
 
 /* describes properties of a command parser */
