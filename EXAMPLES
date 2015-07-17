@@ -1,29 +1,31 @@
 #
 # setup:
 
-alias send-ns='nc localhost 1234'
-sudo ./ns2 0.0.0.0 :: 1234 &   # for lock file & fd transfer
+$ alias send-ns='nc localhost 1234'
+$ sudo ./ns2 0.0.0.0 :: 1234 &   # for lock file & fd transfer
 
 #
 # examples:
 
-# run a command (echo) with "binary" output
-echo 'echo,test1;ctl-recv,somestr;ctl-status;' | send-ns > out.bin
-# get its return code
-echo 'ctl-send,somestr' | send-ns
+# run a simple command, get its return value
+$ echo 'echo,test1;ctl-status;' | send-ns
 
-# run an external command, passing binary input
-# (see what exec/summer does first)
-{ echo 'exec,summer'; cat /bin/bash; } | send-ns  # md5sum on server
-cat /bin/bash | md5sum -                          # md5sum on our machine
-# (both should be identical)
+# interactively communicate with a remote command
+$ send-ns
+cat;echo,finished!;
 
-# combine the two above, sum a binary stream, interact per partes
-# - prepare the server, detach
-echo 'ctl-recv;exec,summer;ctl-recv;ctl-status;' | send-ns
-# - send / receive just the binary data to / from the summer
-{ echo 'ctl-send'; cat /bin/bash; } | send-ns
-# - locally check the sum (should be identical)
-cat /bin/bash | md5sum -
-# - collect the return values from the server
-echo 'ctl-send' | send-ns
+# schedule a delayed action
+$ addr=$(echo 'myaddr' | send-ns)
+$ echo "ctl-detach;sleep,5;send,$addr,tcp,4321;" | send-ns
+$ nc -l 4321
+
+# use a persistent session to execute multiple commands
+# and check their status
+$ s=$(echo 'SESSION' | send-ns)
+$ alias send-ns="nc localhost $s"
+
+$ echo 'echo,hello!' | send-ns
+$ { echo 'exec,summer'; cat /bin/bash; } | send-ns
+$ echo 'echo,and;echo,all;echo,done!;' | send-ns
+$ cat /bin/bash | md5sum -  # should have the same hash
+$ echo 'ctl-status;ctl-end;' | send-ns
