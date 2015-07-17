@@ -22,7 +22,7 @@
 #define MSG_PEEK_MAX 16
 /* maximum size of the control socket output buffer, which holds command
  * names and their return values for delayed retrieval */
-#define CTL_OUTBUFF_MAX 8192
+#define CTL_OUTBUFF_MAX 16384
 
 /* cmd linked list management - the input control cmdline is parsed and
  * transformed using these functions into a linked list before execution */
@@ -107,20 +107,27 @@ static struct cmd *parse_cmds(char *cmdline)
 }
 
 /* based on an argc+argv, rebuild the original `,'-separated command */
-static char *rebuild_args(int argc, char **argv)
+static void rebuild_args(int argc, char **argv, char *dest, size_t destmax)
 {
-    int i, len = 0;
-    char *args;
-    for (i = 0; i < argc; i++)
-        len += strlen(argv[i]) + 1; /* for `,' */
-    args = xmalloc(len);
-    *args = '\0';
-    for (i = 0; i < argc; i++) {
-        strcat(args, argv[i]);
-        if (i < argc-1)
-            strcat(args, ",");
+    int i;
+    size_t arglen;
+
+    if (!destmax)
+        return;
+
+    *dest = '\0';
+    destmax--;
+    for (i = 0; i < argc && destmax; i++) {
+        arglen = strlen(argv[i]);
+        if (arglen <= destmax) {
+            strncat(dest, argv[i], destmax);
+            destmax -= arglen;
+        }
+        if (i < argc-1 && destmax) {
+            strcat(dest, ",");
+            destmax--;
+        }
     }
-    return args;
 }
 
 /* append printf-formatted string to the buffer, but only if the entire
@@ -156,7 +163,7 @@ static int snprintfcat(char *str, size_t size, const char *format, ...)
 static void process_cmds(struct session_info *sinfo, struct cmd *cmd)
 {
     int rc;
-    char *args;
+    char args[100];
     struct cmd *tmp = NULL;
 
     /* for each command */
@@ -167,9 +174,8 @@ static void process_cmds(struct session_info *sinfo, struct cmd *cmd)
         if (rc < 0)
             error_down("cmd %s raised a fatal error\n", cmd->argv[0]);
         /* append "$rc $name" to the ctl outbuff */
-        args = rebuild_args(cmd->argc, cmd->argv);
+        rebuild_args(cmd->argc, cmd->argv, args, sizeof(args));
         snprintfcat(sinfo->ctl_outbuff, CTL_OUTBUFF_MAX, "%d %s\n", rc, args);
-        free(args);
         /* next command */
         tmp = cmd;
         cmd = cmd->next;
