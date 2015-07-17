@@ -58,15 +58,13 @@ static struct cmd *cmd_list_rewind(struct cmd *end)
 static int parse_argv(char ***argv, char *string, char *delims)
 {
     int argc = 0;
-    char *arg, *tmp;
+    char *arg;
 
     *argv = NULL;
-    arg = strtok_r(string, delims, &tmp);
-    while (arg) {
+    while ((arg = strsep(&string, delims))) {
         argc++;
         *argv = xrealloc(*argv, sizeof(char*) * argc);
         (*argv)[argc-1] = arg;
-        arg = strtok_r(NULL, delims, &tmp);
     }
     return argc;
 }
@@ -84,15 +82,16 @@ static struct cmd_desc *find_cmd_desc(char *name)
 /* parse cmd structures (with argc/argv) out of a control cmdline into a list */
 static struct cmd *parse_cmds(char *cmdline)
 {
-    char *cmd_args, *tmp;
+    char *cmd_args;
     struct cmd *cmd = NULL;
 
     int argc;
     char **argv;
     struct cmd_desc *desc;
 
-    cmd_args = strtok_r(cmdline, ";", &tmp);
-    while (cmd_args) {
+    while ((cmd_args = strsep(&cmdline, ";"))) {
+        if (!*cmd_args)
+            continue;  /* silently skip empty cmds */
         argc = parse_argv(&argv, cmd_args, ",");
         if (!argc)
             error_down("cmd args empty\n");
@@ -100,7 +99,6 @@ static struct cmd *parse_cmds(char *cmdline)
         if (!desc)
             error_down("cmd not found: %s\n", argv[0]);
         cmd = cmd_list_add(cmd, argc, argv, desc);
-        cmd_args = strtok_r(NULL, ";", &tmp);
     }
 
     /* first cmd of the list */
