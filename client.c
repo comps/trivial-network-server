@@ -255,25 +255,17 @@ static ssize_t sockread_line(int fd, char *rcvbuff, size_t buffsiz)
 
 /* copy a (possibly connected) socket into a new, listening one, copying the
  * addr structure and selecting a random port to listen on */
-static int sock_ctol(int sock, int backlog, int *port)
+int sock_ctol(int sock, int stype, int sproto, int backlog, int *port)
 {
+    int lsock;
+
     union {
         struct sockaddr sa;
         struct sockaddr_in in;
         struct sockaddr_in6 in6;
     } saddr;
     socklen_t slen;
-    int lsock, domain, type, proto;
 
-    slen = sizeof(int);
-    if (getsockopt(sock, SOL_SOCKET, SO_DOMAIN, &domain, &slen) == -1)
-        return -1;
-    slen = sizeof(int);
-    if (getsockopt(sock, SOL_SOCKET, SO_TYPE, &type, &slen) == -1)
-        return -1;
-    slen = sizeof(int);
-    if (getsockopt(sock, SOL_SOCKET, SO_PROTOCOL, &proto, &slen) == -1)
-        return -1;
     slen = sizeof(saddr);
     if (getsockname(sock, (struct sockaddr *)&saddr, &slen) == -1)
         return -1;
@@ -284,14 +276,14 @@ static int sock_ctol(int sock, int backlog, int *port)
         default:        return -1;
     }
 
-    lsock = socket(domain, type, proto);
+    lsock = socket(saddr.sa.sa_family, stype, sproto);
     if (lsock < 0)
         return -1;
 
     if (bind(lsock, &saddr.sa, slen) == -1)
         goto err;
 
-    if (type == SOCK_STREAM || type == SOCK_SEQPACKET) {
+    if (stype == SOCK_STREAM || stype == SOCK_SEQPACKET) {
         if (listen(lsock, backlog) == -1)
             goto err;
     }
@@ -340,7 +332,7 @@ void process_client(int clientfd)
     /* new session requested - multi-cmdline client */
     if (!strcmp(buff, "SESSION")) {
         /* start listening, send port nr. to client */
-        lsock = sock_ctol(clientfd, 10, &lport);
+        lsock = sock_ctol(clientfd, SOCK_STREAM, IPPROTO_TCP, 10, &lport);
         if (lsock == -1)
             perror_down("session listener");
         dprintf(clientfd, "%d\n", lport);

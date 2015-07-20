@@ -80,17 +80,18 @@ void *xmalloc(size_t);
 void *xrealloc(void *, size_t);
 ssize_t xrecv(int, void *, size_t, int);
 void (*xsignal(int, void (*)(int)))(int);
-int linger(int sock, int op);
+int linger(int, int);
 
 /* generic helpers from shared.c */
 #define REMOTE_ADDRA_MAX 46 /* should hold about anything */
-int remote_addra(int sock, char *dest);
+int remote_addra(int, char *);
 struct cmd_desc *cmd_descs_iterate(struct cmd_desc *);
 
 /* helper functions from main.c */
 int create_socket(char *, char *, int, int);
 
 /* client processing functions from client.c */
+int sock_ctol(int, int, int, int, int *);
 void process_client(int);
 
 /* cleanup signal handler from cleanup.c */
@@ -98,6 +99,6 @@ void cleanup_sig_handler(int);
 void cleanup_exit_handler(int);
 
 /* defined by various commands, useful elsewhere */
-int death_timer(int seconds);
+int death_timer(int);
 
 #endif /* SHARED_H */
