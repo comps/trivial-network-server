@@ -19,9 +19,8 @@
 /* this function *can not* depend on any variable provided by the parent
  * (such as fork() return value) during runtime as it's called from a signal
  * handler on at least one occasion */
-static int
-traverse_children(pid_t ppid, void (*callback)(pid_t pid, void *data),
-                  void *callback_data)
+int traverse_children(pid_t ppid, void (*callback)(pid_t pid, void *data),
+                      void *callback_data)
 {
     DIR *proc;
     struct dirent *entry;

@@ -95,6 +95,8 @@ int sock_ctol(int, int, int, int, int *);
 void process_client(int);
 
 /* cleanup signal handler from cleanup.c */
+#include <sys/types.h>
+int traverse_children(pid_t, void (*)(pid_t, void *), void *);
 void cleanup_sig_handler(int);
 void cleanup_exit_handler(int);
 

@@ -149,8 +149,16 @@ word SESSION, followed by a newline, to the server, in stead of the ctl cmdline.
 The server replies with a number, followed by a newline, indicating the
 listening port of the session. The client can then communicate on this port with
 the server instead of the primary server process, sending commands in multiple
-connections, collecting command status and finally exiting the session using
-the `ctl-end' command.
+connections, optionally collecting command status:
+
+$ s=$(nc <server> <port> <<<"SESSION")
+$ nc <server> "$s" <<<"cmd1;cmd2"
+$ nc <server> "$s" <<<"ctl-status"
+
+The session can be ended either via the "ctl-end" command given within the
+session itself (like "ctl-status" above) or externally using the
+"ctl-kill,<sessionid>" command, which can be issued from a session-less cmdline
+or another session.
 
 Q: Don't multiple cmdlines break the binary data flow?
 An earlier section described that the server won't ever read anything beyond
