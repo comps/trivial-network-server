@@ -46,6 +46,7 @@ static int parse(int argc, char **argv, struct session_info *info)
     char **newargv;
     char execpath[MAX_PATH_LEN];
     char raddr[13+ASCII_ADDR_MAX] = "REMOTE_ADDR=";
+    char laddr[12+ASCII_ADDR_MAX] = "LOCAL_ADDR=";
 
     if (argc < 2)
         return ERR_RET;
@@ -63,9 +64,12 @@ static int parse(int argc, char **argv, struct session_info *info)
 
     newargv = append_zero_elem(argv, argc);
 
-    if (info->sock != -1)
+    if (info->sock != -1) {
         if (ascii_addr(info->sock, raddr+strlen(raddr), getpeername) == -1)
             return ERR_RET;
+        if (ascii_addr(info->sock, laddr+strlen(laddr), getsockname) == -1)
+            return ERR_RET;
+    }
 
     childpid = fork();
     switch (childpid) {
@@ -84,6 +88,8 @@ static int parse(int argc, char **argv, struct session_info *info)
                 if (dup2(info->sock, STDOUT_FILENO) == -1)
                     exit(-1);
                 if (putenv(raddr))
+                    exit(-1);
+                if (putenv(laddr))
                     exit(-1);
             }
 
