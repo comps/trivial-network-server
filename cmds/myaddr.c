@@ -4,8 +4,8 @@
 static int parse(int argc, char **argv, struct session_info *info)
 {
     UNUSED2(argc, argv);
-    char addr[REMOTE_ADDRA_MAX];
-    if (remote_addra(info->sock, addr) == -1)
+    char addr[ASCII_ADDR_MAX];
+    if (ascii_addr(info->sock, addr, getpeername) == -1)
         return 1;
     dprintf(info->sock, "%s\n", addr);
     return 0;

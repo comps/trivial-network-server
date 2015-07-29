@@ -83,9 +83,10 @@ int linger(int sock, int op)
                &(struct linger){!op, 0}, sizeof(struct linger));
 }
 
-/* get addr of the remote socket as a string (inet_ntoa format)
- * and store it in an external dest buffer */
-int remote_addra(int sock, char *dest)
+/* store the ascii equivalent of a local/remote addr into a char[],
+ * the "func" arg should be either getsockname() or getpeername() */
+int ascii_addr(int sock, char *dest,
+               int (*func)(int, struct sockaddr *, socklen_t *))
 {
     union {
         struct sockaddr sa;
@@ -95,7 +96,7 @@ int remote_addra(int sock, char *dest)
     socklen_t slen;
 
     slen = sizeof(saddr);
-    if (getpeername(sock, (struct sockaddr *)&saddr, &slen) == -1)
+    if (func(sock, (struct sockaddr *)&saddr, &slen) == -1)
         return -1;
 
     switch (saddr.sa.sa_family) {

@@ -45,7 +45,7 @@ static int parse(int argc, char **argv, struct session_info *info)
     pid_t childpid;
     char **newargv;
     char execpath[MAX_PATH_LEN];
-    char remoteaddr[13+REMOTE_ADDRA_MAX] = "REMOTE_ADDR=";
+    char raddr[13+ASCII_ADDR_MAX] = "REMOTE_ADDR=";
 
     if (argc < 2)
         return ERR_RET;
@@ -64,7 +64,7 @@ static int parse(int argc, char **argv, struct session_info *info)
     newargv = append_zero_elem(argv, argc);
 
     if (info->sock != -1)
-        if (remote_addra(info->sock, remoteaddr+strlen(remoteaddr)) == -1)
+        if (ascii_addr(info->sock, raddr+strlen(raddr), getpeername) == -1)
             return ERR_RET;
 
     childpid = fork();
@@ -83,7 +83,7 @@ static int parse(int argc, char **argv, struct session_info *info)
                     exit(-1);
                 if (dup2(info->sock, STDOUT_FILENO) == -1)
                     exit(-1);
-                if (putenv(remoteaddr))
+                if (putenv(raddr))
                     exit(-1);
             }
 

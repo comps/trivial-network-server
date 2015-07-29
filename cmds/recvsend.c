@@ -99,12 +99,12 @@ static int cmd_send(int argc, char **argv, struct session_info *info)
 
 static int cmd_sendback(int argc, char **argv, struct session_info *info)
 {
-    char remote[REMOTE_ADDRA_MAX];
+    char remote[ASCII_ADDR_MAX];
 
     if (argc < 3)
         return 1;
 
-    if (remote_addra(info->sock, remote) == -1)
+    if (ascii_addr(info->sock, remote, getpeername) == -1)
         return 1;
 
     return recvsend(DIR_SEND, info, remote, argv[1], argv[2], 1);

@@ -83,8 +83,9 @@ void (*xsignal(int, void (*)(int)))(int);
 int linger(int, int);
 
 /* generic helpers from shared.c */
-#define REMOTE_ADDRA_MAX 46 /* should hold about anything */
-int remote_addra(int, char *);
+#include <arpa/inet.h>
+#define ASCII_ADDR_MAX INET6_ADDRSTRLEN /* should hold about anything */
+int ascii_addr(int, char *, int (*)(int, struct sockaddr *, socklen_t *));
 struct cmd_desc *cmd_descs_iterate(struct cmd_desc *);
 
 /* helper functions from main.c */
