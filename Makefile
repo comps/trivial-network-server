@@ -18,3 +18,9 @@ install: ns2
 	systemctl daemon-reload
 	systemctl enable ns2
 	systemctl start ns2
+
+uninstall:
+	systemctl stop ns2
+	systemctl disable ns2
+	rm -f /etc/systemd/system/ns2.service
+	systemctl daemon-reload
