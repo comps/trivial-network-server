@@ -1,0 +1,50 @@
+These are some of the good practices to follow when using ns2 (this server)
+within the audit-test suite.
+
+1) respect shared/exclusive locks
+---------------------------------
+
+See README on '## LOCKING ##' to see how it works. Generally speaking, you
+do *not* need to use locks if you
+
+  - use only one connection (or session creation + one additional connection)
+  - use only the default ns2 port
+  - don't spawn additional children
+  - don't connect/sendto anywhere
+  - don't start listening on any ports
+  - don't execute any external commands (see spawning children above)
+
+This means that ie. calling 'myaddr' or 'noop' without a shared lock is fine,
+because it obeys the rules above and gives no additional overhead over what the
+'lock' command would do - that's the borderline.
+If you can do less or equal amount of system invasion than the 'lock' command
+would, you don't need to use locking.
+
+For anything complex (listening/sending/cmd execution/..), use shared locks,
+preferably with a big enough timeout on the initial 'lock' command. Usage of
+sessions is encouraged as you don't need to lock on every command.
+
+When you need exclusive access, use exclusive locks. Remember to unlock or
+degrade your lock back to shared (may block, use big timeout!), especially
+with sessions as sessions don't exit (unlock) when send_ns returns (!!!).
+If you can, use the 'timeout' cmd after the 'lock' cmd to minimize the amount
+of time spent with exclusive access if anything hangs up.
+
+Always try to reduce the amount of time you need to spend while having exclusive
+access as others need to use the server as well.
+
+Ie.
+    # start a session
+    s=$(send_ns -S remote)
+    # get shared lock
+    send_ns -t 600 -s $s remote "lock"
+    # run cmd1 and cmd2 under shared lock
+    send_ns -s $s remote "cmd1;cmd2"
+    # run cmd3 under exclusive lock
+    send_ns -t 600 -s $s remote "lock;cmd3;unlock"
+    # run cmd4 under shared lock
+    send_ns -s $s remote "cmd4"
+    # end the session
+    send_ns -s $s -E remote
+    # (alternatively, from a cleanup script) kill the session
+    send_ns -s $s -K remote
