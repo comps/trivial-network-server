@@ -46,12 +46,12 @@ static int cmd_cmds(int argc, char **argv, struct session_info *info)
     return 0;
 }
 
-static int cmd_fail(int argc, char **argv, struct session_info *info)
+static int cmd_noop(int argc, char **argv, struct session_info *info)
 {
     UNUSED(info);
     if (argc >= 2)
         return atoi(argv[1]);
-    return -1;
+    return 0;
 }
 
 static __newcmd struct cmd_desc cmd1 = {
@@ -67,6 +67,6 @@ static __newcmd struct cmd_desc cmd3 = {
     .parse = cmd_cmds,
 };
 static __newcmd struct cmd_desc cmd4 = {
-    .name = "fail",
-    .parse = cmd_fail,
+    .name = "noop",
+    .parse = cmd_noop,
 };
