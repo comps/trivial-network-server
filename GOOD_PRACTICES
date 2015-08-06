@@ -24,25 +24,28 @@ For anything complex (listening/sending/cmd execution/..), use shared locks.
 Usage of sessions is encouraged as you don't need to lock on every command.
 
 When you need exclusive access, use exclusive locks. Remember to unlock or
-degrade your lock back to shared (may block, use big timeout!), especially
-with sessions as sessions don't exit (unlock) when send_ns returns (!!!).
+degrade your lock back to shared, especially with sessions as sessions don't
+exit (unlock) when send_ns returns (!!!). The best option is to specify
+unlock/degradation on the same cmdline part as the exclusive lock, meaning that
+even if the test dies completely, the rest of the cmdline part still gets run
+and the server is unlocked.
+
 If you can, use the 'timeout' cmd after the 'lock' cmd to minimize the amount
 of time spent with exclusive access if anything hangs up.
-
-Always try to reduce the amount of time you need to spend while having exclusive
-access as others need to use the server as well.
+Also, always try to reduce the amount of time you need to spend while having
+exclusive access as others need to use the server as well.
 
 Ie.
     # start a session
     s=$(send_ns -S remote)
     # get shared lock
-    send_ns -s $s remote "lock"
+    send_ns -s $s remote "lock,sh"
     # run cmd1 and cmd2 under shared lock
     send_ns -s $s remote "cmd1;cmd2"
     # run cmd3 under exclusive lock
-    send_ns -s $s remote "lock;cmd3;unlock"
+    send_ns -s $s remote "lock,ex;cmd3;lock,sh"
     # run dangerous cmd4 (may hang) under another exclusive lock
-    send_ns -s $s remote "lock;timeout,60;cmd3;timeout;unlock"
+    send_ns -s $s remote "lock,ex;timeout,60;cmd3;timeout;lock,sh"
     # run cmd5 under shared lock
     send_ns -s $s remote "cmd4"
     # end the session

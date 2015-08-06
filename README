@@ -129,10 +129,9 @@ Therefore it's up to the clients to lock the server with a shared lock on each
 new connection, giving them the ability to do it the non-blocking way, with the
 option to opt-out in critical situations.
 
-Note that - in this flock() implementation - while exclusive lock attempt is
-waiting, new clients can freely connect with a shared lock, meaning the request
-for exclusive access can easily starve. This can't be reasonably fixed, the one
-client will simply have to wait until all others are done.
+Note that this locking implementation works around the reader bias inherent to
+the underlying flock() backend and makes all readers and writers have equal
+chance of getting the lock - see comments in cmds/lock.c.
 
 ## PERSISTENT SESSIONS ##
 
