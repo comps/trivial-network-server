@@ -39,11 +39,14 @@ int death_timer(int seconds)
 static int parse(int argc, char **argv, struct session_info *info)
 {
     UNUSED(info);
+    int secs;
 
     if (argc < 2)
-        return 1;
+        secs = 0;
+    else
+        secs = atoi(argv[1]);
 
-    if (death_timer(atoi(argv[1])) == -1)
+    if (death_timer(secs) == -1)
         return 1;
 
     return 0;

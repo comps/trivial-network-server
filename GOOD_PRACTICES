@@ -20,9 +20,8 @@ because it obeys the rules above and gives no additional overhead over what the
 If you can do less or equal amount of system invasion than the 'lock' command
 would, you don't need to use locking.
 
-For anything complex (listening/sending/cmd execution/..), use shared locks,
-preferably with a big enough timeout on the initial 'lock' command. Usage of
-sessions is encouraged as you don't need to lock on every command.
+For anything complex (listening/sending/cmd execution/..), use shared locks.
+Usage of sessions is encouraged as you don't need to lock on every command.
 
 When you need exclusive access, use exclusive locks. Remember to unlock or
 degrade your lock back to shared (may block, use big timeout!), especially
@@ -37,12 +36,14 @@ Ie.
     # start a session
     s=$(send_ns -S remote)
     # get shared lock
-    send_ns -t 600 -s $s remote "lock"
+    send_ns -s $s remote "lock"
     # run cmd1 and cmd2 under shared lock
     send_ns -s $s remote "cmd1;cmd2"
     # run cmd3 under exclusive lock
-    send_ns -t 600 -s $s remote "lock;cmd3;unlock"
-    # run cmd4 under shared lock
+    send_ns -s $s remote "lock;cmd3;unlock"
+    # run dangerous cmd4 (may hang) under another exclusive lock
+    send_ns -s $s remote "lock;timeout,60;cmd3;timeout;unlock"
+    # run cmd5 under shared lock
     send_ns -s $s remote "cmd4"
     # end the session
     send_ns -s $s -E remote
