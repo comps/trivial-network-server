@@ -84,6 +84,7 @@ int linger(int sock, int op)
 }
 
 /* store the ascii equivalent of a local/remote addr into a char[],
+ * which *must* be at least ASCII_ADDR_MAX bytes big.
  * the "func" arg should be either getsockname() or getpeername() */
 int ascii_addr(int sock, char *dest,
                int (*func)(int, struct sockaddr *, socklen_t *))
@@ -101,11 +102,13 @@ int ascii_addr(int sock, char *dest,
 
     switch (saddr.sa.sa_family) {
         case AF_INET:
-            if (inet_ntop(AF_INET, &saddr.in.sin_addr, dest, slen) == NULL)
+            if (inet_ntop(AF_INET, &saddr.in.sin_addr, dest,
+                                   ASCII_ADDR_MAX) == NULL)
                 return -1;
             break;
         case AF_INET6:
-            if (inet_ntop(AF_INET6, &saddr.in6.sin6_addr, dest, slen) == NULL)
+            if (inet_ntop(AF_INET6, &saddr.in6.sin6_addr, dest,
+                                    ASCII_ADDR_MAX) == NULL)
                 return -1;
             break;
         default:
