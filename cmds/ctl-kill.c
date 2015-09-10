@@ -95,7 +95,7 @@ static unsigned long find_socket(int family, int proto, char *addrport)
     int rc;
     char fname[15] = "/proc/net/";
     FILE *f;
-    char c;
+    int c;
     char readaddr[38]; /* in hex: 32 addr, :, 4 port, \0 */
     unsigned long inode;
 
