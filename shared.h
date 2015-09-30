@@ -73,9 +73,14 @@ extern struct cmd_desc __stop_cmd_descs;
 /** helper functions **/
 
 /* small helper/wrapper functions from shared.c */
-void error(char *, ...);
-void error_down(char *, ...);
-void perror_down(char *);
+void _verbose(char *, int, char *, ...);
+#define verbose(...) _verbose(__FILE__, __LINE__, __VA_ARGS__)
+void _error(char *, int, char *, ...);
+#define error(...) _error(__FILE__, __LINE__, __VA_ARGS__)
+void _error_down(char *, int, char *, ...);
+#define error_down(...) _error_down(__FILE__, __LINE__, __VA_ARGS__)
+void _perror_down(char *, int, char *);
+#define perror_down(...) _perror_down(__FILE__, __LINE__, __VA_ARGS__)
 void *xmalloc(size_t);
 void *xrealloc(void *, size_t);
 ssize_t xrecv(int, void *, size_t, int);

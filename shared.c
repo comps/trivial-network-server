@@ -11,32 +11,47 @@
 
 #include "shared.h"
 
-/* format an error msg */
-void error(char *fmt, ...)
+/* format a verbose message */
+void _verbose(char *file, int line, char *fmt, ...)
 {
     va_list ap;
     if (fmt) {
         va_start(ap, fmt);
+        fprintf(stdout, "%s:%d: ", file, line);
+        vfprintf(stdout, fmt, ap);
+        va_end(ap);
+    }
+}
+/* format an error msg */
+void _error(char *file, int line, char *fmt, ...)
+{
+    va_list ap;
+    if (fmt) {
+        va_start(ap, fmt);
+        fprintf(stderr, "%s:%d: ", file, line);
         vfprintf(stderr, fmt, ap);
         va_end(ap);
     }
 }
 /* exit with msg, never return */
-void error_down(char *fmt, ...)
+void _error_down(char *file, int line, char *fmt, ...)
 {
     va_list ap;
     if (fmt) {
         va_start(ap, fmt);
+        fprintf(stderr, "%s:%d: ", file, line);
         vfprintf(stderr, fmt, ap);
         va_end(ap);
     }
     exit(EXIT_FAILURE);
 }
 /* use perror to print error, exit, never return */
-void perror_down(char *msg)
+void _perror_down(char *file, int line, char *msg)
 {
-    if (msg)
+    if (msg) {
+        fprintf(stderr, "%s:%d: ", file, line);
         perror(msg);
+    }
     exit(EXIT_FAILURE);
 }
 
