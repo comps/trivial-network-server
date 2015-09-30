@@ -172,12 +172,14 @@ static void process_cmds(struct session_info *sinfo, struct cmd *cmd)
     /* for each command */
     while (cmd) {
         sinfo->cmd = cmd;
+        rebuild_args(cmd->argc, cmd->argv, args, sizeof(args));
+        verbose("starting cmd %s\n", args);
         /* call the parser */
         rc = cmd->desc->parse(cmd->argc, cmd->argv, sinfo);
         if (rc < 0)
             error_down("cmd %s raised a fatal error\n", cmd->argv[0]);
+        verbose("ending cmd %s\n", args);
         /* append "$rc $name" to the ctl outbuff */
-        rebuild_args(cmd->argc, cmd->argv, args, sizeof(args));
         snprintfcat(sinfo->ctl_outbuff, CTL_OUTBUFF_MAX, "%d %s\n", rc, args);
         /* next command */
         tmp = cmd;
@@ -314,6 +316,12 @@ void process_client(int clientfd)
     struct cmd *cmds;
     int lsock, lport;
 
+    char remote_ascii[ASCII_ADDR_MAX];
+    if (ascii_addr(clientfd, remote_ascii, getpeername) == -1)
+        strcpy(remote_ascii, "unknown");
+
+    verbose("new connection from %s\n", remote_ascii);
+
     /* let client detect unexpected errors (as conn reset) */
     linger(clientfd, 0);
 
@@ -338,12 +346,19 @@ void process_client(int clientfd)
         dprintf(clientfd, "%d\n", lport);
         linger(clientfd, 1);
         close(clientfd);
+        verbose("started new session for %s = %d\n", remote_ascii, lport);
 
         sinfo.active = 1;
         while (sinfo.active) {
             sinfo.sock = accept(lsock, NULL, NULL);
             if (sinfo.sock == -1)
                 perror("session accept");
+
+            if (ascii_addr(sinfo.sock, remote_ascii, getpeername) == -1)
+                strcpy(remote_ascii, "unknown");
+            verbose("new connection to session %d from %s\n",
+                    lport, remote_ascii);
+
             linger(sinfo.sock, 0);
             /* read control cmdline */
             sockread_line(sinfo.sock, buff, sizeof(buff));
@@ -355,7 +370,10 @@ void process_client(int clientfd)
             process_cmds(&sinfo, cmds);
             linger(sinfo.sock, 1);
             close(sinfo.sock);
+            verbose("closing connection to session %d from %s\n",
+                    lport, remote_ascii);
         }
+        verbose("closing session %d\n", lport);
 
     /* simple single-cmdline client */
     } else {
@@ -367,6 +385,7 @@ void process_client(int clientfd)
         process_cmds(&sinfo, cmds);
         linger(sinfo.sock, 1);
         close(sinfo.sock);
+        verbose("closing connection to %s\n", remote_ascii);
     }
 
     free(sinfo.ctl_outbuff);
