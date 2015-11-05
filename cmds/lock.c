@@ -31,9 +31,17 @@
 static int lockfd = -1;
 static int gatefd = -1;
 
-/* note: when doing exclusive->shared, this algorithm could deadlock
- * when acquiring gate on some locking backends, but flock(2) lets us
- * call LOCK_EX multiple times on the same descriptor */
+/* we always, ALWAYS, have to unlock the main lock before trying to upgrade it
+ * flock() would normally allow us to change the lock type without unlocking,
+ * but that doesn't account for the gate lock, consider:
+ *   - proc1 gets gate (w), gets lock (r), releases gate
+ *   - proc2 gets gate (w), blocks on lock (w)
+ *   - proc1 wants to upgrade to w
+ *   - proc1 blocks on gate (w) because proc2 didn't release it
+ *   ----> deadlock
+ * this doesn't happen on downgrade as we already hold both locks as write
+ * and flock() allows us to downgrade before unlocking
+ */
 int xflock(int gate, int lock, int op)
 {
     int nb = (op & LOCK_NB);
@@ -44,19 +52,25 @@ int xflock(int gate, int lock, int op)
         if (flock(gate, LOCK_UN) == -1)
             return -1;
     }
-    if (op & (LOCK_EX|LOCK_SH)) {
+    if (op & LOCK_EX) {
+        /* if EX->EX, we get the lock back immediately as we hold gate */
+        if (flock(lock, LOCK_UN) == -1)
+            return -1;
         if (flock(gate, LOCK_EX | nb) == -1)
             return -1;
-        if (flock(lock, op) == -1) {
+        if (flock(lock, LOCK_EX) == -1) {
             flock(gate, LOCK_UN);
             return -1;
         }
-    }
-    if (op & LOCK_SH) {
-        if (flock(gate, LOCK_UN) == -1) {
-            flock(lock, LOCK_UN);
+    } else if (op & LOCK_SH) {
+        if (flock(gate, LOCK_EX | nb) == -1)
+            return -1;
+        if (flock(lock, LOCK_SH) == -1) {
+            flock(gate, LOCK_UN);
             return -1;
         }
+        if (flock(gate, LOCK_UN) == -1)
+            return -1;
     }
     return 0;
 }
