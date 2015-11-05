@@ -346,6 +346,7 @@ void process_client(int clientfd)
         dprintf(clientfd, "%d\n", lport);
         linger(clientfd, 1);
         close(clientfd);
+        verbose("closing connection to %s\n", remote_ascii);
         verbose("started new session for %s = %d\n", remote_ascii, lport);
 
         sinfo.active = 1;
