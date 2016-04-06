@@ -22,6 +22,19 @@ void _verbose(char *file, int line, char *fmt, ...)
         va_end(ap);
     }
 }
+/* format a verbose message with additional socket info */
+void _verbose_s(char *file, int line, int sock, char *fmt, ...)
+{
+    va_list ap;
+    int port;
+    if (fmt) {
+        port = get_port(sock, getsockname);
+        va_start(ap, fmt);
+        fprintf(stdout, "%s:%d|%d: ", file, line, port);
+        vfprintf(stdout, fmt, ap);
+        va_end(ap);
+    }
+}
 /* format an error msg */
 void _error(char *file, int line, char *fmt, ...)
 {
@@ -131,6 +144,28 @@ int ascii_addr(int sock, char *dest,
     }
 
     return 0;
+}
+
+/* return port number (sock or peer) associated with a socket,
+ * the "func" arg should be either getsockname() or getpeername() */
+int get_port(int sock, int (*func)(int, struct sockaddr *, socklen_t *))
+{
+    union {
+        struct sockaddr sa;
+        struct sockaddr_in in;
+        struct sockaddr_in6 in6;
+    } saddr;
+    socklen_t slen;
+
+    slen = sizeof(saddr);
+    if (func(sock, (struct sockaddr *)&saddr, &slen) == -1)
+        return -1;
+
+    switch (saddr.sa.sa_family) {
+        case AF_INET:   return ntohs(saddr.in.sin_port);
+        case AF_INET6:  return ntohs(saddr.in6.sin6_port);
+        default:        return -1;
+    }
 }
 
 /* iterate over cmd descs in the cmds ELF section */

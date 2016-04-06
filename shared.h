@@ -75,6 +75,8 @@ extern struct cmd_desc __stop_cmd_descs;
 /* small helper/wrapper functions from shared.c */
 void _verbose(char *, int, char *, ...);
 #define verbose(...) _verbose(__FILE__, __LINE__, __VA_ARGS__)
+void _verbose_s(char *, int, int, char *, ...);
+#define verbose_s(...) _verbose_s(__FILE__, __LINE__, __VA_ARGS__)
 void _error(char *, int, char *, ...);
 #define error(...) _error(__FILE__, __LINE__, __VA_ARGS__)
 void _error_down(char *, int, char *, ...);
@@ -91,6 +93,7 @@ int linger(int, int);
 #include <arpa/inet.h>
 #define ASCII_ADDR_MAX INET6_ADDRSTRLEN /* should hold about anything */
 int ascii_addr(int, char *, int (*)(int, struct sockaddr *, socklen_t *));
+int get_port(int, int (*)(int, struct sockaddr *, socklen_t *));
 struct cmd_desc *cmd_descs_iterate(struct cmd_desc *);
 
 /* helper functions from main.c */
