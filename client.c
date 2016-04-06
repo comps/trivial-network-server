@@ -357,7 +357,7 @@ void process_client(int clientfd)
 
             if (ascii_addr(sinfo.sock, remote_ascii, getpeername) == -1)
                 strcpy(remote_ascii, "unknown");
-            verbose_s(clientfd, "new connection from %s\n", remote_ascii);
+            verbose_s(sinfo.sock, "new connection from %s\n", remote_ascii);
 
             linger(sinfo.sock, 0);
             /* read control cmdline */
