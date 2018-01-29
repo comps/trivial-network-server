@@ -56,8 +56,8 @@ static int parse(int argc, char **argv, struct session_info *info)
         return ERR_RET;
 
     *execpath = '\0';
-    strncat(execpath, EXEC_DIR "/", MAX_PATH_LEN);
-    strncat(execpath, argv[1], MAX_PATH_LEN);
+    strncat(execpath, EXEC_DIR "/", MAX_PATH_LEN-1);
+    strncat(execpath, argv[1], MAX_PATH_LEN-1);
 
     if (access(execpath, R_OK|X_OK) != 0)
         return ERR_RET;
