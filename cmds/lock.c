@@ -6,8 +6,12 @@
 #include <sys/file.h>
 #include "shared.h"
 
-#define LOCK_FILE "./ns2.lock"
-#define LOCK_GATE_FILE "./ns2-gate.lock"
+#ifndef LOCK_DIR
+#define LOCK_DIR "."
+#endif
+
+#define LOCK_FILE      LOCK_DIR "/main.lock"
+#define LOCK_GATE_FILE LOCK_DIR "/gate.lock"
 
 /* gain/release a lock over the entire server
  *

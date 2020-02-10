@@ -1,27 +1,36 @@
-TOPDIR		= ../..
+all: tns
 
-include $(TOPDIR)/rules.mk
-
-ALL_EXE		= ns2
+EXEC_DIR=/usr/libexec/trivial-network-server
+LOCK_DIR=/var/lock/trivial-network-server
+BIN_DIR=/usr/local/bin
 
 # maybe-uninitialized disabled due to numerous gcc bugs // false positives
-ns2: CFLAGS += -Wextra -std=gnu99 -pedantic -I$(CURDIR) -Wno-maybe-uninitialized
-ns2: LDFLAGS += -lselinux
+tns: CFLAGS += -Wextra -std=gnu99 -pedantic -I$(CURDIR) -Wno-maybe-uninitialized
+tns: CFLAGS += -DEXEC_DIR='"$(EXEC_DIR)"' -DLOCK_DIR='"$(LOCK_DIR)"'
+tns: LDFLAGS += -lselinux
 
-ns2: shared.c main.c client.c cleanup.c cmds/*.c
+tns: shared.c main.c client.c cleanup.c cmds/*.c
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
-executables: $(ALL_EXE)
-
-install: ns2
-	install -o root -g root -m 0644 ns2.service /etc/systemd/system
-	restorecon -v /etc/systemd/system/ns2.service
+.PHONY: install
+install: tns
+	install -o root -g root -m 0644 -t /etc/systemd/system trivial-network-server.service
+	install -o root -g root -m 0755 -T tns "$(BIN_DIR)/trivial-network-server"
+	restorecon -vF /etc/systemd/system/trivial-network-server.service
+	restorecon -vF "$(BIN_DIR)/trivial-network-server"
+	cd exec; find . -type d -exec install -v -o root -g root -m 0755 -d '$(EXEC_DIR)/{}' \;
+	cd exec; find . -type f -exec install -v -o root -g root -m 0755 -D '{}' '$(EXEC_DIR)/{}' \;
+	restorecon -RvF "$(EXEC_DIR)"
+	install -o root -g root -m 0755 -d "$(LOCK_DIR)"
 	systemctl daemon-reload
-	systemctl enable ns2
-	systemctl start ns2
 
+.PHONY: uninstall
 uninstall:
-	systemctl stop ns2
-	systemctl disable ns2
-	rm -f /etc/systemd/system/ns2.service
+	rm -f /etc/systemd/system/trivial-network-server.service
+	rm -f "$(BIN_DIR)/trivial-network-server"
+	rm -rf "$(EXEC_DIR)" "$(LOCK_DIR)"
 	systemctl daemon-reload
+
+.PHONY: clean
+clean:
+	rm -f tns

@@ -1,6 +1,3 @@
-These are some of the good practices to follow when using ns2 (this server)
-within the audit-test suite.
-
 1) respect shared/exclusive locks
 ---------------------------------
 
@@ -8,7 +5,7 @@ See README on '## LOCKING ##' to see how it works. Generally speaking, you
 do *not* need to use locks if you
 
   - use only one connection (or session creation + one additional connection)
-  - use only the default ns2 port
+  - use only the default server port
   - don't spawn additional children
   - don't connect/sendto anywhere
   - don't start listening on any ports

@@ -11,8 +11,10 @@
 
 /* directory prefix for executing files - we don't allow any arbitrary
  * path to be executed, only files in this dir
- * (by default, use relative path to cwd of the server) */
-#define EXEC_DIR "./exec"
+ * (by default, use cwd of the server) */
+#ifndef EXEC_DIR
+#define EXEC_DIR "."
+#endif
 
 /* maximum file path length (incl. EXEC_DIR above, excl. argv) */
 #define MAX_PATH_LEN 4096

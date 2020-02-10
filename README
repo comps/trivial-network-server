@@ -1,6 +1,13 @@
+## ACKNOWLEDGEMENT ##
+
+This "trivial network server" originally comes from the audit-test project,
+where it was named "network server" (or "ns2") and was primarily used for
+providing services to systems under test (such as remote auditing setup,
+verifying SELinux labels of connected sockets, IPSec sanity checks, etc.).
+
 ## OVERVIEW ##
 
-This is "ns2", a (hopefully) simple "network server" (not /name/ server)
+This is "tns", a (hopefully) trivial "network server" (not /name/ server)
 which can be thought of as a request-response TCP netcat-like server,
 for generic use.
 
